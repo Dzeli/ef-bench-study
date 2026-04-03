@@ -14,52 +14,65 @@
 
 <script>
 // ════════════════════════════════════════════════════════════════════════════
-//  CONFIGURATION — edit these two lines before deploying
+//  CONFIGURATION
 // ════════════════════════════════════════════════════════════════════════════
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxqgHAN5D5ee3rsKoI5Js1M-eWqjnLmhgqWIfdDtNB-60zT_xM0qo5m_nwp94y2g_8BSg/exec";   // paste your Google Apps Script Web App URL here
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxqgHAN5D5ee3rsKoI5Js1M-eWqjnLmhgqWIfdDtNB-60zT_xM0qo5m_nwp94y2g_8BSg/exec";
+const STUDY_CODE = "EFB2026";
 
 // ════════════════════════════════════════════════════════════════════════════
 //  TASK DATA
 // ════════════════════════════════════════════════════════════════════════════
 const ESTABLISHMENT = [
-  { s: "The cat slept on the warm radiator.", living: true  },
-  { s: "A candle flickered on the kitchen table.", living: false },
+  { s: "The cat slept on the warm radiator.",         living: true  },
+  { s: "A candle flickered on the kitchen table.",    living: false },
   { s: "The children ran through the autumn leaves.", living: true  },
-  { s: "The old bicycle leaned against the wall.", living: false },
-  { s: "A robin perched on the garden fence.", living: true  },
-  { s: "The kettle whistled on the stove.", living: false },
-  { s: "The farmer's dog barked at the gate.", living: true  },
-  { s: "An empty bottle rolled across the floor.", living: false },
-  { s: "Wildflowers grew along the riverbank.", living: true  },
-  { s: "The clock on the wall stopped ticking.", living: false },
+  { s: "The old bicycle leaned against the wall.",    living: false },
+  { s: "A robin perched on the garden fence.",        living: true  },
+  { s: "The kettle whistled on the stove.",           living: false },
+  { s: "The farmer's dog barked at the gate.",        living: true  },
+  { s: "An empty bottle rolled across the floor.",    living: false },
+  { s: "Wildflowers grew along the riverbank.",       living: true  },
+  { s: "The clock on the wall stopped ticking.",      living: false },
 ];
 
-const POST_SWITCH = [
+const POST_SWITCH_BASE = [
   { s: "A squirrel buried nuts under the oak tree.", living: true  },
-  { s: "The hammer lay on the workbench.", living: false },
-  { s: "Three crows circled above the field.", living: true  },
-  { s: "The broken window let in the cold air.", living: false },
-  { s: "The old mare grazed in the meadow.", living: true  },
-  { s: "Dust settled on the empty shelf.", living: false },
-  { s: "A moth flew toward the porch light.", living: true  },
-  { s: "The iron gate creaked in the wind.", living: false },
-  { s: "The shepherd guided his flock downhill.", living: true  },
-  { s: "Snow covered the abandoned car.", living: false },
+  { s: "The hammer lay on the workbench.",           living: false },
+  { s: "Three crows circled above the field.",       living: true  },
+  { s: "The broken window let in the cold air.",     living: false },
+  { s: "The old mare grazed in the meadow.",         living: true  },
+  { s: "Dust settled on the empty shelf.",           living: false },
+  { s: "A moth flew toward the porch light.",        living: true  },
+  { s: "The iron gate creaked in the wind.",         living: false },
+  { s: "The shepherd guided his flock downhill.",    living: true  },
+  { s: "Snow covered the abandoned car.",            living: false },
 ];
 
+// Novel probe items — kept in fixed order (not alternating, no need to shuffle)
 const NOVEL = [
-  { s: "Bacteria spread across the petri dish.", living: true  },
-  { s: "A cactus stood in the corner of the room.", living: true  },
-  { s: "The robot moved along the warehouse floor.", living: false },
-  { s: "A flame flickered at the tip of the candle.", living: false },
+  { s: "Bacteria spread across the petri dish.",       living: true  },
+  { s: "A cactus stood in the corner of the room.",    living: true  },
+  { s: "The robot moved along the warehouse floor.",   living: false },
+  { s: "A flame flickered at the tip of the candle.",  living: false },
   { s: "A crystal grew slowly inside the sealed jar.", living: false },
 ];
 
-const ALL_TRIALS = [...ESTABLISHMENT, ...POST_SWITCH, ...NOVEL];
-const CONDITIONS = ["explicit", "partial_3", "implicit"];
+// ── Fisher-Yates shuffle ──────────────────────────────────────────────────
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
+// Shuffle post-switch trials once on page load — breaks alternating pattern
+const POST_SWITCH = shuffle(POST_SWITCH_BASE);
+const ALL_TRIALS = [...ESTABLISHMENT, ...POST_SWITCH, ...NOVEL];
+
+const CONDITIONS = ["explicit", "partial_3", "implicit"];
 const HINT = "Note: the rule governing correct responses may have changed.";
-const NEW_RULE_ANNOUNCEMENT = `The rule has changed.\n\nNEW RULE: If the sentence contains a living thing → respond OBJECT.\nIf it does not → respond ALIVE.`;
 
 // ════════════════════════════════════════════════════════════════════════════
 //  HELPERS
@@ -78,52 +91,60 @@ function pickCondition() {
     const n = parseInt(localStorage.getItem('efb_count') || '0');
     localStorage.setItem('efb_count', String(n + 1));
     return CONDITIONS[n % 3];
-  } catch (e) {
+  } catch(e) {
     return CONDITIONS[Math.floor(Math.random() * 3)];
   }
+}
+
+function alreadyDone() {
+  try { return !!localStorage.getItem('efb_done'); }
+  catch(e) { return false; }
+}
+
+function markDone() {
+  try { localStorage.setItem('efb_done', '1'); }
+  catch(e) {}
 }
 
 // ════════════════════════════════════════════════════════════════════════════
 //  STATE
 // ════════════════════════════════════════════════════════════════════════════
 const S = {
-  view: 'welcome',
-  pid: genId(),
-  condition: pickCondition(),
-  trialIdx: 0,
-  responses: [],
-  feedback: null,
-  consec: 0,
+  view:         alreadyDone() ? 'already_done' : 'welcome',
+  pid:          genId(),
+  condition:    pickCondition(),
+  trialIdx:     0,
+  responses:    [],
+  feedback:     null,
+  consec:       0,
   demographics: {},
-  metacog: '',
-  saving: false,
-  error: null,
+  metacog:      '',
+  saving:       false,
+  error:        null,
+  _trialStart:  null,
 };
 
 // ════════════════════════════════════════════════════════════════════════════
 //  COMPUTED METRICS
 // ════════════════════════════════════════════════════════════════════════════
 function computeMetrics() {
-  const post = S.responses.filter(r => r.phase === 'post_switch');
+  const post  = S.responses.filter(r => r.phase === 'post_switch');
   const novel = S.responses.filter(r => r.phase === 'novel');
 
   let persev = 0;
-  for (const r of post) {
-    if (!r.isCorrect) persev++;
-    else break;
-  }
+  for (const r of post) { if (!r.isCorrect) persev++; else break; }
 
-  const recoveryIdx = post.findIndex(r => r.isCorrect);
+  const recoveryIdx   = post.findIndex(r => r.isCorrect);
   const recoveryTrial = recoveryIdx === -1 ? null : recoveryIdx + 1;
 
-  const postAcc = post.length ? post.filter(r => r.isCorrect).length / post.length : 0;
+  const postAcc  = post.length  ? post.filter(r => r.isCorrect).length  / post.length  : 0;
   const novelAcc = novel.length ? novel.filter(r => r.isCorrect).length / novel.length : 0;
 
-  const seq = post.map(r => r.isCorrect ? '✓' : '✗').join('');
+  const seq      = post.map(r  => r.isCorrect ? '✓' : '✗').join('');
   const novelSeq = novel.map(r => r.isCorrect ? '✓' : '✗').join('');
 
   const oscil = post.reduce((c, r, i) =>
-    i > 0 && r.isCorrect !== post[i - 1].isCorrect ? c + 1 : c, 0);
+    i > 0 && r.isCorrect !== post[i-1].isCorrect ? c + 1 : c, 0);
 
   return { persev, recoveryTrial, postAcc, novelAcc, seq, novelSeq, oscil };
 }
@@ -137,27 +158,26 @@ async function submitResults() {
 
   const metrics = computeMetrics();
   const payload = {
-    pid: S.pid,
-    condition: S.condition,
-    timestamp: new Date().toISOString(),
+    pid:          S.pid,
+    condition:    S.condition,
+    timestamp:    new Date().toISOString(),
     demographics: S.demographics,
     metrics,
-    responses: S.responses,
-    metacog: S.metacog,
+    responses:    S.responses,
+    metacog:      S.metacog,
+    // Record shuffled trial order for reproducibility
+    post_switch_order: POST_SWITCH.map(t => t.s),
   };
 
-
-  // Submit to Apps Script using hidden form + iframe to avoid CORS issues
   if (APPS_SCRIPT_URL) {
-    try {
-      await submitViaHiddenForm(payload);
-    } catch (e) {
-      S.error = 'Auto-submit failed — results were downloaded to your device instead.';
-    }
+    try { await submitViaHiddenForm(payload); }
+    catch(e) { S.error = 'Auto-submit failed — please screenshot the completion code.'; }
   }
 
+  markDone(); // prevent duplicate submissions from same device
+
   S.saving = false;
-  S.view = 'done';
+  S.view   = 'done';
   render();
 }
 
@@ -166,52 +186,41 @@ function ensureHiddenTransport() {
   if (!iframe) {
     iframe = document.createElement('iframe');
     iframe.name = 'hidden_iframe';
-    iframe.id = 'hidden_iframe';
+    iframe.id   = 'hidden_iframe';
     iframe.style.display = 'none';
     document.body.appendChild(iframe);
   }
-
   let form = document.getElementById('gasForm');
   if (!form) {
     form = document.createElement('form');
-    form.id = 'gasForm';
+    form.id     = 'gasForm';
     form.method = 'POST';
     form.target = 'hidden_iframe';
     form.style.display = 'none';
     document.body.appendChild(form);
   }
-
   let input = document.getElementById('payloadField');
   if (!input) {
     input = document.createElement('input');
     input.type = 'hidden';
     input.name = 'payload';
-    input.id = 'payloadField';
+    input.id   = 'payloadField';
     form.appendChild(input);
   }
-
   form.action = APPS_SCRIPT_URL;
   return { form, input };
 }
 
 function submitViaHiddenForm(payload) {
   return new Promise((resolve, reject) => {
-    if (!APPS_SCRIPT_URL) {
-      resolve();
-      return;
-    }
-
     try {
       const { form, input } = ensureHiddenTransport();
       input.value = JSON.stringify(payload);
       form.submit();
       resolve();
-    } catch (err) {
-      reject(err);
-    }
+    } catch(err) { reject(err); }
   });
 }
-
 
 // ════════════════════════════════════════════════════════════════════════════
 //  EVENT HANDLERS
@@ -220,32 +229,32 @@ function handleDemographicsSubmit(e) {
   e.preventDefault();
   const f = e.target;
   S.demographics = {
-    age: f.age.value,
-    education: f.education.value,
+    age:            f.age.value,
+    education:      f.education.value,
     native_english: f.native_english.value,
-    background: f.background.value,
+    background:     f.background.value,
   };
   S.view = 'instruction';
   render();
 }
 
 function handleResponse(response) {
-  const trial = ALL_TRIALS[S.trialIdx];
-  const correct = getCorrect(trial, S.trialIdx);
+  const trial     = ALL_TRIALS[S.trialIdx];
+  const correct   = getCorrect(trial, S.trialIdx);
   const isCorrect = response === correct;
-  const isPost = S.trialIdx >= 10;
+  const isPost    = S.trialIdx >= 10;
 
   if (isPost) S.consec = isCorrect ? 0 : S.consec + 1;
 
   S.responses.push({
-    trialIdx: S.trialIdx,
-    sentence: trial.s,
-    living: trial.living,
+    trialIdx:  S.trialIdx,
+    sentence:  trial.s,
+    living:    trial.living,
     response,
     correct,
     isCorrect,
-    phase: S.trialIdx < 10 ? 'establishment' : S.trialIdx < 20 ? 'post_switch' : 'novel',
-    rt_ms: Date.now() - S._trialStart,
+    phase:  S.trialIdx < 10 ? 'establishment' : S.trialIdx < 20 ? 'post_switch' : 'novel',
+    rt_ms:  Date.now() - S._trialStart,
   });
 
   const showHint =
@@ -253,24 +262,18 @@ function handleResponse(response) {
     S.condition === 'partial_3' && S.consec >= 3;
 
   S.feedback = { isCorrect, showHint };
-  S.view = 'feedback';
+  S.view     = 'feedback';
   render();
 }
 
 function handleNext() {
   const next = S.trialIdx + 1;
   if (next === 10 && S.condition === 'explicit') {
-    S.trialIdx = next;
-    S.view = 'announce';
-    S.feedback = null;
+    S.trialIdx = next; S.view = 'announce'; S.feedback = null;
   } else if (next >= 25) {
-    S.trialIdx = next;
-    S.view = 'metacog';
-    S.feedback = null;
+    S.trialIdx = next; S.view = 'metacog';  S.feedback = null;
   } else {
-    S.trialIdx = next;
-    S.view = 'trial';
-    S.feedback = null;
+    S.trialIdx = next; S.view = 'trial';    S.feedback = null;
   }
   render();
 }
@@ -280,135 +283,53 @@ function handleNext() {
 // ════════════════════════════════════════════════════════════════════════════
 const CSS = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   body {
     font-family: Georgia, 'Times New Roman', serif;
-    background: #fafaf8;
-    color: #1a1a1a;
-    min-height: 100vh;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding: 40px 20px 80px;
+    background: #fafaf8; color: #1a1a1a;
+    min-height: 100vh; display: flex; align-items: flex-start;
+    justify-content: center; padding: 40px 20px 80px;
   }
-
-  .shell {
-    width: 100%;
-    max-width: 580px;
-  }
-
+  .shell { width: 100%; max-width: 580px; }
   .eyebrow {
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: #888;
-    margin-bottom: 28px;
+    font-family: 'Courier New', monospace; font-size: 11px;
+    letter-spacing: 0.15em; text-transform: uppercase; color: #888; margin-bottom: 28px;
   }
-
-  h1 {
-    font-size: 26px;
-    font-weight: normal;
-    line-height: 1.3;
-    margin-bottom: 20px;
-    color: #111;
-  }
-
-  h2 {
-    font-size: 18px;
-    font-weight: normal;
-    margin-bottom: 16px;
-    color: #222;
-  }
-
-  p, li {
-    font-size: 15px;
-    line-height: 1.75;
-    color: #444;
-    margin-bottom: 12px;
-  }
-
+  h1 { font-size: 26px; font-weight: normal; line-height: 1.3; margin-bottom: 20px; color: #111; }
+  h2 { font-size: 18px; font-weight: normal; margin-bottom: 16px; color: #222; }
+  p, li { font-size: 15px; line-height: 1.75; color: #444; margin-bottom: 12px; }
   ul { padding-left: 20px; margin-bottom: 16px; }
 
   .rule-box {
-    background: #fff;
-    border: 1px solid #ddd;
-    border-left: 4px solid #2d6b47;
-    padding: 18px 22px;
-    margin: 24px 0;
-    font-family: 'Courier New', monospace;
-    font-size: 13px;
-    line-height: 1.7;
-    color: #1a1a1a;
+    background: #fff; border: 1px solid #ddd; border-left: 4px solid #2d6b47;
+    padding: 18px 22px; margin: 24px 0;
+    font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.7; color: #1a1a1a;
   }
-
-  .rule-box.new-rule {
-    border-left-color: #1a3d8f;
-    background: #f0f4ff;
-    animation: fadeIn 0.35s ease;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-4px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
+  .rule-box.new-rule { border-left-color: #1a3d8f; background: #f0f4ff; animation: fadeIn 0.35s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 
   .btn {
-    display: inline-block;
-    padding: 13px 28px;
-    background: #1a1a1a;
-    color: #fff;
-    font-family: 'Courier New', monospace;
-    font-size: 13px;
-    letter-spacing: 0.05em;
-    border: none;
-    cursor: pointer;
-    transition: background 0.15s;
-    text-decoration: none;
-    margin-right: 10px;
-    margin-top: 8px;
+    display: inline-block; padding: 13px 28px; background: #1a1a1a; color: #fff;
+    font-family: 'Courier New', monospace; font-size: 13px; letter-spacing: 0.05em;
+    border: none; cursor: pointer; transition: background 0.15s;
+    text-decoration: none; margin-right: 10px; margin-top: 8px;
   }
-
   .btn:hover { background: #333; }
   .btn.secondary { background: transparent; color: #555; border: 1px solid #ccc; }
   .btn.secondary:hover { background: #f0f0f0; }
   .btn:disabled { background: #999; cursor: not-allowed; }
 
   .sentence-card {
-    background: #fff;
-    border: 1px solid #ddd;
-    padding: 30px 28px;
-    margin: 28px 0;
-    font-size: 17px;
-    line-height: 1.6;
-    color: #111;
-    min-height: 88px;
-    display: flex;
-    align-items: center;
-    animation: fadeIn 0.2s ease;
+    background: #fff; border: 1px solid #ddd; padding: 30px 28px; margin: 28px 0;
+    font-size: 17px; line-height: 1.6; color: #111; min-height: 88px;
+    display: flex; align-items: center; animation: fadeIn 0.2s ease;
     box-shadow: 0 1px 4px rgba(0,0,0,0.04);
   }
-
-  .response-btns {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
-    margin-top: 8px;
-  }
-
+  .response-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 8px; }
   .rbtn {
-    padding: 22px 16px;
-    border: 2px solid #ddd;
-    background: #fff;
-    font-family: 'Courier New', monospace;
-    font-size: 17px;
-    font-weight: bold;
-    letter-spacing: 0.1em;
-    cursor: pointer;
-    transition: all 0.15s;
-    text-align: center;
+    padding: 22px 16px; border: 2px solid #ddd; background: #fff;
+    font-family: 'Courier New', monospace; font-size: 17px; font-weight: bold;
+    letter-spacing: 0.1em; cursor: pointer; transition: all 0.15s; text-align: center;
   }
-
   .rbtn.alive  { color: #1a6b38; border-color: #a8d5b8; }
   .rbtn.alive:hover  { background: #edf7f0; border-color: #2d8a4f; }
   .rbtn.object { color: #1a3d8f; border-color: #a8bce0; }
@@ -417,32 +338,16 @@ const CSS = `
 
   .progress-wrap { margin-bottom: 28px; }
   .progress-meta {
-    display: flex;
-    justify-content: space-between;
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    color: #999;
-    margin-bottom: 7px;
+    display: flex; justify-content: space-between;
+    font-family: 'Courier New', monospace; font-size: 11px; color: #999; margin-bottom: 7px;
   }
-  .progress-bar {
-    height: 3px;
-    background: #e8e8e8;
-    border-radius: 2px;
-  }
-  .progress-fill {
-    height: 100%;
-    background: #888;
-    border-radius: 2px;
-    transition: width 0.3s ease;
-  }
+  .progress-bar { height: 3px; background: #e8e8e8; border-radius: 2px; }
+  .progress-fill { height: 100%; background: #888; border-radius: 2px; transition: width 0.3s ease; }
 
   .feedback-box {
-    padding: 16px 20px;
-    margin: 20px 0;
-    font-family: 'Courier New', monospace;
-    font-size: 14px;
-    border: 1px solid #ddd;
-    animation: fadeIn 0.2s ease;
+    padding: 16px 20px; margin: 20px 0;
+    font-family: 'Courier New', monospace; font-size: 14px;
+    border: 1px solid #ddd; animation: fadeIn 0.2s ease;
   }
   .feedback-box.correct   { border-color: #2d8a4f; color: #1a6b38; background: #f0fbf4; }
   .feedback-box.incorrect { border-color: #c0392b; color: #a93226; background: #fdf3f2; }
@@ -450,77 +355,38 @@ const CSS = `
 
   .form-group { margin-bottom: 22px; }
   .form-group label {
-    display: block;
-    font-size: 14px;
-    color: #333;
-    margin-bottom: 8px;
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    display: block; margin-bottom: 8px;
+    font-family: 'Courier New', monospace; font-size: 12px;
+    letter-spacing: 0.05em; text-transform: uppercase; color: #333;
   }
-  .form-group select, .form-group input {
-    width: 100%;
-    padding: 10px 14px;
-    border: 1px solid #ccc;
-    background: #fff;
-    font-family: Georgia, serif;
-    font-size: 15px;
-    color: #1a1a1a;
-    appearance: none;
-    -webkit-appearance: none;
+  .form-group select {
+    width: 100%; padding: 10px 14px; border: 1px solid #ccc; background: #fff;
+    font-family: Georgia, serif; font-size: 15px; color: #1a1a1a;
+    appearance: none; -webkit-appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 0l6 8 6-8z' fill='%23666'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 14px center;
+    background-repeat: no-repeat; background-position: right 14px center;
   }
   .form-group select:focus { outline: none; border-color: #888; }
   .form-divider { border: none; border-top: 1px solid #e8e8e8; margin: 32px 0; }
 
-  .completion-box {
-    background: #fff;
-    border: 1px solid #ddd;
-    padding: 24px 28px;
-    margin: 28px 0;
-  }
-  .completion-code {
-    font-family: 'Courier New', monospace;
-    font-size: 28px;
-    font-weight: bold;
-    color: #1a1a1a;
-    letter-spacing: 0.15em;
-    margin: 12px 0;
-  }
-  .seq-display {
-    font-family: 'Courier New', monospace;
-    font-size: 18px;
-    letter-spacing: 3px;
-    margin: 8px 0;
-  }
+  .completion-box { background: #fff; border: 1px solid #ddd; padding: 24px 28px; margin: 28px 0; }
+  .seq-display { font-family: 'Courier New', monospace; font-size: 18px; letter-spacing: 3px; margin: 8px 0; }
   .ok  { color: #1a6b38; }
   .err { color: #c0392b; }
 
   .info-box {
-    background: #fff8e8;
-    border: 1px solid #e8d88a;
-    padding: 14px 18px;
-    margin: 16px 0;
-    font-size: 13px;
-    color: #5a4500;
-    line-height: 1.6;
+    background: #fff8e8; border: 1px solid #e8d88a; padding: 14px 18px;
+    margin: 16px 0; font-size: 13px; color: #5a4500; line-height: 1.6;
+  }
+  .already-box {
+    background: #fdf3f2; border: 1px solid #e8b8b8; padding: 24px 28px;
+    margin: 28px 0; font-size: 15px; color: #7a2020; line-height: 1.7;
   }
 
   textarea {
-    width: 100%;
-    background: #fff;
-    border: 1px solid #ccc;
-    color: #1a1a1a;
-    font-family: Georgia, serif;
-    font-size: 15px;
-    padding: 14px 16px;
-    resize: vertical;
-    min-height: 110px;
-    margin: 16px 0;
-    line-height: 1.6;
+    width: 100%; background: #fff; border: 1px solid #ccc; color: #1a1a1a;
+    font-family: Georgia, serif; font-size: 15px; padding: 14px 16px;
+    resize: vertical; min-height: 110px; margin: 16px 0; line-height: 1.6;
   }
   textarea:focus { outline: none; border-color: #888; }
 
@@ -538,6 +404,21 @@ const CSS = `
 function render() {
   const { view, trialIdx, feedback, metacog, saving, error } = S;
 
+  // ── Already done ──────────────────────────────────────────────────────────
+  if (view === 'already_done') {
+    setHTML(`
+      <div class="eyebrow">EF-Bench · Human Baseline Study</div>
+      <h1>Already completed</h1>
+      <div class="already-box">
+        It looks like you have already completed this study from this device.
+        Each person should complete the task only once — thank you for your participation!
+      </div>
+      <p style="font-size:13px;color:#888">If you believe this is an error (e.g. different person on same device), please contact the researcher.</p>
+    `);
+    return;
+  }
+
+  // ── Welcome ───────────────────────────────────────────────────────────────
   if (view === 'welcome') {
     setHTML(`
       <div class="eyebrow">EF-Bench · Human Baseline Study</div>
@@ -554,6 +435,7 @@ function render() {
     return;
   }
 
+  // ── Demographics ──────────────────────────────────────────────────────────
   if (view === 'demographics') {
     setHTML(`
       <div class="eyebrow">Background information</div>
@@ -565,11 +447,8 @@ function render() {
           <label for="age">Age range</label>
           <select name="age" id="age" required>
             <option value="">Select…</option>
-            <option>18–25</option>
-            <option>26–35</option>
-            <option>36–45</option>
-            <option>46–55</option>
-            <option>56+</option>
+            <option>18–25</option><option>26–35</option>
+            <option>36–45</option><option>46–55</option><option>56+</option>
           </select>
         </div>
         <div class="form-group">
@@ -610,6 +489,7 @@ function render() {
     return;
   }
 
+  // ── Instruction ───────────────────────────────────────────────────────────
   if (view === 'instruction') {
     setHTML(`
       <div class="eyebrow">Instructions</div>
@@ -629,6 +509,7 @@ function render() {
     return;
   }
 
+  // ── Announce (explicit condition only) ────────────────────────────────────
   if (view === 'announce') {
     setHTML(`
       <div class="eyebrow">Important — rule change</div>
@@ -647,44 +528,42 @@ function render() {
     return;
   }
 
+  // ── Trial ─────────────────────────────────────────────────────────────────
   if (view === 'trial') {
     if (!S._trialStart) S._trialStart = Date.now();
     const trial = ALL_TRIALS[trialIdx];
     const phase = trialIdx < 10 ? 'Part 1' : trialIdx < 20 ? 'Part 2' : 'Part 3';
-    const pct = (trialIdx / 25) * 100;
+    const pct   = (trialIdx / 25) * 100;
     setHTML(`
       <div class="progress-wrap">
         <div class="progress-meta">
           <span>Trial ${trialIdx + 1} of 25</span>
           <span>${phase}</span>
         </div>
-        <div class="progress-bar">
-          <div class="progress-fill" style="width:${pct}%"></div>
-        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
       </div>
       <div class="sentence-card">${trial.s}</div>
       <div class="response-btns">
-        <button class="rbtn alive" onclick="handleResponse('ALIVE')">ALIVE</button>
+        <button class="rbtn alive"  onclick="handleResponse('ALIVE')">ALIVE</button>
         <button class="rbtn object" onclick="handleResponse('OBJECT')">OBJECT</button>
       </div>
     `);
     return;
   }
 
+  // ── Feedback ──────────────────────────────────────────────────────────────
   if (view === 'feedback') {
     const trial = ALL_TRIALS[trialIdx];
     const phase = trialIdx < 10 ? 'Part 1' : trialIdx < 20 ? 'Part 2' : 'Part 3';
-    const pct = ((trialIdx + 1) / 25) * 100;
-    const fb = feedback || {};
+    const pct   = ((trialIdx + 1) / 25) * 100;
+    const fb    = feedback || {};
     setHTML(`
       <div class="progress-wrap">
         <div class="progress-meta">
           <span>Trial ${trialIdx + 1} of 25</span>
           <span>${phase}</span>
         </div>
-        <div class="progress-bar">
-          <div class="progress-fill" style="width:${pct}%"></div>
-        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
       </div>
       <div class="sentence-card">${trial.s}</div>
       <div class="feedback-box ${fb.isCorrect ? 'correct' : 'incorrect'}">
@@ -698,16 +577,14 @@ function render() {
     return;
   }
 
+  // ── Metacognitive probe ───────────────────────────────────────────────────
   if (view === 'metacog') {
     setHTML(`
       <div class="eyebrow">Final question</div>
       <h1>One last question</h1>
       <p>During the last several sentences, you may have received INCORRECT responses.</p>
       <p><strong>Did you notice anything unusual?</strong> If so, please describe in 2–3 sentences what you think happened.</p>
-      <textarea
-        placeholder="Your answer here…"
-        oninput="S.metacog=this.value"
-      >${metacog}</textarea>
+      <textarea placeholder="Your answer here…" oninput="S.metacog=this.value">${metacog}</textarea>
       <p style="font-size:13px;color:#888">You can leave this blank if you have nothing to add.</p>
       <div style="margin-top:24px">
         <button class="btn" onclick="submitResults()" ${saving ? 'disabled' : ''}>
@@ -718,21 +595,27 @@ function render() {
     return;
   }
 
+  // ── Done ──────────────────────────────────────────────────────────────────
   if (view === 'done') {
     const metrics = computeMetrics();
     const seqHtml = metrics.seq.split('').map(c =>
-      `<span class="${c === '✓' ? 'ok' : 'err'}">${c}</span>`).join('');
+      `<span class="${c==='✓'?'ok':'err'}">${c}</span>`).join('');
     setHTML(`
       <div class="eyebrow">Complete</div>
       <h1>Thank you!</h1>
       <p>Your participation is greatly appreciated.</p>
       ${error ? `<div class="info-box">${error}</div>` : ''}
       <div class="completion-box">
+        <div style="font-family:'Courier New',monospace;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.1em">Completion code</div>
+        <div style="font-family:'Courier New',monospace;font-size:28px;font-weight:bold;color:#1a1a1a;letter-spacing:0.15em;margin:10px 0">${STUDY_CODE}</div>
+        <div style="font-size:13px;color:#888">Please note this code if required by the researcher.</div>
+      </div>
+      <div class="completion-box">
         <div style="font-family:'Courier New',monospace;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px">Your post-switch sequence</div>
         <div class="seq-display">${seqHtml || '—'}</div>
         <div style="font-size:12px;color:#999;margin-top:8px;font-family:'Courier New',monospace">
-          perseveration: ${metrics.persev} trial${metrics.persev !== 1 ? 's' : ''} &nbsp;|&nbsp;
-          accuracy: ${(metrics.postAcc * 100).toFixed(0)}%
+          perseveration: ${metrics.persev} trial${metrics.persev!==1?'s':''} &nbsp;|&nbsp;
+          accuracy: ${(metrics.postAcc*100).toFixed(0)}%
         </div>
       </div>
     `);
@@ -754,7 +637,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.head.appendChild(style);
 
   const app = document.createElement('div');
-  app.id = 'app';
+  app.id        = 'app';
   app.className = 'shell';
   document.body.appendChild(app);
 
