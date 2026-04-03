@@ -17,7 +17,6 @@
 //  CONFIGURATION — edit these two lines before deploying
 // ════════════════════════════════════════════════════════════════════════════
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxqgHAN5D5ee3rsKoI5Js1M-eWqjnLmhgqWIfdDtNB-60zT_xM0qo5m_nwp94y2g_8BSg/exec";   // paste your Google Apps Script Web App URL here
-const STUDY_CODE = "EFB2026"; // shown to participants as completion code
 
 // ════════════════════════════════════════════════════════════════════════════
 //  TASK DATA
@@ -147,8 +146,6 @@ async function submitResults() {
     metacog: S.metacog,
   };
 
-  // Always offer download as backup
-  downloadJSON(payload);
 
   // Submit to Apps Script using hidden form + iframe to avoid CORS issues
   if (APPS_SCRIPT_URL) {
@@ -215,15 +212,6 @@ function submitViaHiddenForm(payload) {
   });
 }
 
-function downloadJSON(payload) {
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `efbench_${S.pid}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 // ════════════════════════════════════════════════════════════════════════════
 //  EVENT HANDLERS
@@ -740,11 +728,6 @@ function render() {
       <p>Your participation is greatly appreciated.</p>
       ${error ? `<div class="info-box">${error}</div>` : ''}
       <div class="completion-box">
-        <div style="font-family:'Courier New',monospace;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.1em">Completion code</div>
-        <div class="completion-code">${STUDY_CODE}</div>
-        <div style="font-size:13px;color:#888;margin-top:4px">Please note this code if required by the researcher.</div>
-      </div>
-      <div class="completion-box">
         <div style="font-family:'Courier New',monospace;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px">Your post-switch sequence</div>
         <div class="seq-display">${seqHtml || '—'}</div>
         <div style="font-size:12px;color:#999;margin-top:8px;font-family:'Courier New',monospace">
@@ -752,7 +735,6 @@ function render() {
           accuracy: ${(metrics.postAcc * 100).toFixed(0)}%
         </div>
       </div>
-      <p style="font-size:13px;color:#888">Your results have been downloaded to your device as a JSON file. If asked by the researcher, please send them this file.</p>
     `);
     return;
   }
