@@ -94,6 +94,8 @@ const UI = {
     label_seq:        "Your post-switch sequence",
     persev_label:     (n) => `perseveration: ${n} trial${n!==1?'s':''}`,
     acc_label:        (p) => `accuracy: ${p}%`,
+    correct_label: "CORRECT",
+    incorrect_label: "INCORRECT",
   },
   sr: {
     eyebrow_study:    "EF-Bench · Studija kognitivne fleksibilnosti",
@@ -157,7 +159,7 @@ const UI = {
 
     eyebrow_metacog:  "Završno pitanje",
     title_metacog:    "Još jedno pitanje",
-    p_metacog_1:      "Tokom poslednjih nekoliko rečenica, možda ste dobili [INCORRECT] odgovore.",
+    p_metacog_1:      "Tokom poslednjih nekoliko rečenica, možda ste dobili [NETAČNO] odgovore.",
     p_metacog_2:      "<strong>Da li ste primetili nešto neobično?</strong> Ako jeste, molimo opišite u 2–3 rečenice šta mislite da se dogodilo.",
     placeholder_meta: "Vaš odgovor ovde…",
     p_metacog_3:      "Možete ostaviti prazno ako nemate šta da dodate.",
@@ -170,6 +172,9 @@ const UI = {
     label_seq:        "Vaša sekvenca nakon promene pravila",
     persev_label:     (n) => `perseveracija: ${n} pokušaj${n===1?'':'a'}`,
     acc_label:        (p) => `tačnost: ${p}%`,
+
+    correct_label: "TAČNO",
+    incorrect_label: "NETAČNO",
   },
 };
 
@@ -551,7 +556,9 @@ function render() {
       </div>
       <div class="sentence-card">${sentence(trial)}</div>
       <div class="feedback-box ${fb.isCorrect?'correct':'incorrect'}">
-        ${fb.isCorrect ? '[CORRECT]' : '[INCORRECT]'}
+        ${fb.isCorrect 
+          ? `[${T('correct_label')}]` 
+          : `[${T('incorrect_label')}]`}
       </div>
       ${fb.showHint ? `<div class="feedback-box hint">${T('hint')}</div>` : ''}
       <div style="margin-top:28px">
