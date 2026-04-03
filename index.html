@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EF Bench Survey</title>
+</head>
+<body>
+  <h1>EF Bench Survey</h1>
+  <button id="submitBtn">Submit Test Entry</button>
+
+  <script>
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxF1GnygX2MPTb6gePIPp0u4yRjbfvciqlNAZSTzWmSNrqpkFqI2r2TYa0r8ZOjp5XepQ/exec";
+
+    async function submitResults(payload) {
+      try {
+        const response = await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          redirect: "follow",
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8",
+          },
+          body: JSON.stringify({
+            timestamp: new Date().toISOString(),
+            pid: payload.pid || "",
+            condition: payload.condition || "",
+            demographics: {
+              age: payload.demographics?.age || "",
+              education: payload.demographics?.education || "",
+              native_english: payload.demographics?.native_english || "",
+              background: payload.demographics?.background || "",
+            },
+            metrics: {
+              persev: payload.metrics?.persev ?? "",
+              recoveryTrial: payload.metrics?.recoveryTrial ?? "",
+              postAcc: payload.metrics?.postAcc ?? "",
+              novelAcc: payload.metrics?.novelAcc ?? "",
+              seq: payload.metrics?.seq || "",
+              novelSeq: payload.metrics?.novelSeq || "",
+              oscil: payload.metrics?.oscil ?? "",
+            },
+            metacog: payload.metacog || "",
+            responses: Array.isArray(payload.responses) ? payload.responses : [],
+          }),
+        });
+
+        const text = await response.text();
+        const result = JSON.parse(text);
+
+        if (result.status !== "saved") {
+          throw new Error(result.message || "Save failed");
+        }
+
+        alert("Results saved successfully.");
+      } catch (error) {
+        console.error("Submission error:", error);
+        alert("Saving failed: " + (error.message || "Unknown error"));
+      }
+    }
+
+    document.getElementById("submitBtn").addEventListener("click", async () => {
+      const payload = {
+        pid: "P001",
+        condition: "explicit_switch",
+        demographics: {
+          age: "29",
+          education: "Master",
+          native_english: "no",
+          background: "data science",
+        },
+        metrics: {
+          persev: 3,
+          recoveryTrial: 14,
+          postAcc: 0.8,
+          novelAcc: 0.9,
+          seq: "AAAAOO",
+          novelSeq: "AOAO",
+          oscil: 2,
+        },
+        metacog: "I noticed the rule changed after the feedback.",
+        responses: [
+          { trial: 1, stimulus: "dog", answer: "ALIVE", correct: true },
+          { trial: 2, stimulus: "chair", answer: "OBJECT", correct: true },
+        ],
+      };
+
+      await submitResults(payload);
+    });
+  </script>
+</body>
+</html>
