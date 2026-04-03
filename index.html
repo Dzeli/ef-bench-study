@@ -17,7 +17,6 @@
 //  CONFIGURATION
 // ════════════════════════════════════════════════════════════════════════════
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxqgHAN5D5ee3rsKoI5Js1M-eWqjnLmhgqWIfdDtNB-60zT_xM0qo5m_nwp94y2g_8BSg/exec";
-const STUDY_CODE = "EFB2026";
 
 // ════════════════════════════════════════════════════════════════════════════
 //  TASK DATA
@@ -605,11 +604,6 @@ function render() {
       <h1>Thank you!</h1>
       <p>Your participation is greatly appreciated.</p>
       ${error ? `<div class="info-box">${error}</div>` : ''}
-      <div class="completion-box">
-        <div style="font-family:'Courier New',monospace;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.1em">Completion code</div>
-        <div style="font-family:'Courier New',monospace;font-size:28px;font-weight:bold;color:#1a1a1a;letter-spacing:0.15em;margin:10px 0">${STUDY_CODE}</div>
-        <div style="font-size:13px;color:#888">Please note this code if required by the researcher.</div>
-      </div>
       <div class="completion-box">
         <div style="font-family:'Courier New',monospace;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px">Your post-switch sequence</div>
         <div class="seq-display">${seqHtml || '—'}</div>
