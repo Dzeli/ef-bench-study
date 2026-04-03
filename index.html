@@ -1,91 +1,783 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>EF Bench Survey</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EF-Bench · Sentence Labelling Task</title>
+<style>
+/* ─── CONFIG: paste your Google Apps Script URL below ─────────────────────
+   Leave as empty string "" to use download-only mode (results saved locally)
+   ─────────────────────────────────────────────────────────────────────── */
+</style>
 </head>
 <body>
-  <h1>EF Bench Survey</h1>
-  <button id="submitBtn">Submit Test Entry</button>
 
-  <script>
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxF1GnygX2MPTb6gePIPp0u4yRjbfvciqlNAZSTzWmSNrqpkFqI2r2TYa0r8ZOjp5XepQ/exec";
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+//  CONFIGURATION — edit these two lines before deploying
+// ════════════════════════════════════════════════════════════════════════════
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxF1GnygX2MPTb6gePIPp0u4yRjbfvciqlNAZSTzWmSNrqpkFqI2r2TYa0r8ZOjp5XepQ/exec";   // paste your Google Apps Script Web App URL here
+const STUDY_CODE = "EFB2026"; // shown to participants as completion code
 
-    async function submitResults(payload) {
-      try {
-        const response = await fetch(APPS_SCRIPT_URL, {
-          method: "POST",
-          redirect: "follow",
-          headers: {
-            "Content-Type": "text/plain;charset=utf-8",
-          },
-          body: JSON.stringify({
-            timestamp: new Date().toISOString(),
-            pid: payload.pid || "",
-            condition: payload.condition || "",
-            demographics: {
-              age: payload.demographics?.age || "",
-              education: payload.demographics?.education || "",
-              native_english: payload.demographics?.native_english || "",
-              background: payload.demographics?.background || "",
-            },
-            metrics: {
-              persev: payload.metrics?.persev ?? "",
-              recoveryTrial: payload.metrics?.recoveryTrial ?? "",
-              postAcc: payload.metrics?.postAcc ?? "",
-              novelAcc: payload.metrics?.novelAcc ?? "",
-              seq: payload.metrics?.seq || "",
-              novelSeq: payload.metrics?.novelSeq || "",
-              oscil: payload.metrics?.oscil ?? "",
-            },
-            metacog: payload.metacog || "",
-            responses: Array.isArray(payload.responses) ? payload.responses : [],
-          }),
-        });
+// ════════════════════════════════════════════════════════════════════════════
+//  TASK DATA
+// ════════════════════════════════════════════════════════════════════════════
+const ESTABLISHMENT = [
+  { s: "The cat slept on the warm radiator.", living: true  },
+  { s: "A candle flickered on the kitchen table.", living: false },
+  { s: "The children ran through the autumn leaves.", living: true  },
+  { s: "The old bicycle leaned against the wall.", living: false },
+  { s: "A robin perched on the garden fence.", living: true  },
+  { s: "The kettle whistled on the stove.", living: false },
+  { s: "The farmer's dog barked at the gate.", living: true  },
+  { s: "An empty bottle rolled across the floor.", living: false },
+  { s: "Wildflowers grew along the riverbank.", living: true  },
+  { s: "The clock on the wall stopped ticking.", living: false },
+];
 
-        const text = await response.text();
-        const result = JSON.parse(text);
+const POST_SWITCH = [
+  { s: "A squirrel buried nuts under the oak tree.", living: true  },
+  { s: "The hammer lay on the workbench.", living: false },
+  { s: "Three crows circled above the field.", living: true  },
+  { s: "The broken window let in the cold air.", living: false },
+  { s: "The old mare grazed in the meadow.", living: true  },
+  { s: "Dust settled on the empty shelf.", living: false },
+  { s: "A moth flew toward the porch light.", living: true  },
+  { s: "The iron gate creaked in the wind.", living: false },
+  { s: "The shepherd guided his flock downhill.", living: true  },
+  { s: "Snow covered the abandoned car.", living: false },
+];
 
-        if (result.status !== "saved") {
-          throw new Error(result.message || "Save failed");
-        }
+const NOVEL = [
+  { s: "Bacteria spread across the petri dish.", living: true  },
+  { s: "A cactus stood in the corner of the room.", living: true  },
+  { s: "The robot moved along the warehouse floor.", living: false },
+  { s: "A flame flickered at the tip of the candle.", living: false },
+  { s: "A crystal grew slowly inside the sealed jar.", living: false },
+];
 
-        alert("Results saved successfully.");
-      } catch (error) {
-        console.error("Submission error:", error);
-        alert("Saving failed: " + (error.message || "Unknown error"));
-      }
+const ALL_TRIALS = [...ESTABLISHMENT, ...POST_SWITCH, ...NOVEL];
+const CONDITIONS = ["explicit", "partial_3", "implicit"];
+
+const HINT = "Note: the rule governing correct responses may have changed.";
+const NEW_RULE_ANNOUNCEMENT = `The rule has changed.\n\nNEW RULE: If the sentence contains a living thing → respond OBJECT.\nIf it does not → respond ALIVE.`;
+
+// ════════════════════════════════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════════════════════════════════
+function getCorrect(trial, idx) {
+  if (idx < 10) return trial.living ? "ALIVE" : "OBJECT";
+  return trial.living ? "OBJECT" : "ALIVE";
+}
+
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function pickCondition() {
+  try {
+    const n = parseInt(localStorage.getItem('efb_count') || '0');
+    localStorage.setItem('efb_count', String(n + 1));
+    return CONDITIONS[n % 3];
+  } catch (e) {
+    return CONDITIONS[Math.floor(Math.random() * 3)];
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════════════════════════
+const S = {
+  view: 'welcome',
+  pid: genId(),
+  condition: pickCondition(),
+  trialIdx: 0,
+  responses: [],
+  feedback: null,
+  consec: 0,
+  demographics: {},
+  metacog: '',
+  saving: false,
+  error: null,
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+//  COMPUTED METRICS
+// ════════════════════════════════════════════════════════════════════════════
+function computeMetrics() {
+  const post = S.responses.filter(r => r.phase === 'post_switch');
+  const novel = S.responses.filter(r => r.phase === 'novel');
+
+  let persev = 0;
+  for (const r of post) {
+    if (!r.isCorrect) persev++;
+    else break;
+  }
+
+  const recoveryIdx = post.findIndex(r => r.isCorrect);
+  const recoveryTrial = recoveryIdx === -1 ? null : recoveryIdx + 1;
+
+  const postAcc = post.length ? post.filter(r => r.isCorrect).length / post.length : 0;
+  const novelAcc = novel.length ? novel.filter(r => r.isCorrect).length / novel.length : 0;
+
+  const seq = post.map(r => r.isCorrect ? '✓' : '✗').join('');
+  const novelSeq = novel.map(r => r.isCorrect ? '✓' : '✗').join('');
+
+  const oscil = post.reduce((c, r, i) =>
+    i > 0 && r.isCorrect !== post[i - 1].isCorrect ? c + 1 : c, 0);
+
+  return { persev, recoveryTrial, postAcc, novelAcc, seq, novelSeq, oscil };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  SUBMISSION
+// ════════════════════════════════════════════════════════════════════════════
+async function submitResults() {
+  S.saving = true;
+  render();
+
+  const metrics = computeMetrics();
+  const payload = {
+    pid: S.pid,
+    condition: S.condition,
+    timestamp: new Date().toISOString(),
+    demographics: S.demographics,
+    metrics,
+    responses: S.responses,
+    metacog: S.metacog,
+  };
+
+  // Always offer download as backup
+  downloadJSON(payload);
+
+  // Submit to Apps Script using hidden form + iframe to avoid CORS issues
+  if (APPS_SCRIPT_URL) {
+    try {
+      await submitViaHiddenForm(payload);
+    } catch (e) {
+      S.error = 'Auto-submit failed — results were downloaded to your device instead.';
+    }
+  }
+
+  S.saving = false;
+  S.view = 'done';
+  render();
+}
+
+function ensureHiddenTransport() {
+  let iframe = document.getElementById('hidden_iframe');
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.name = 'hidden_iframe';
+    iframe.id = 'hidden_iframe';
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+  }
+
+  let form = document.getElementById('gasForm');
+  if (!form) {
+    form = document.createElement('form');
+    form.id = 'gasForm';
+    form.method = 'POST';
+    form.target = 'hidden_iframe';
+    form.style.display = 'none';
+    document.body.appendChild(form);
+  }
+
+  let input = document.getElementById('payloadField');
+  if (!input) {
+    input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payload';
+    input.id = 'payloadField';
+    form.appendChild(input);
+  }
+
+  form.action = APPS_SCRIPT_URL;
+  return { form, input };
+}
+
+function submitViaHiddenForm(payload) {
+  return new Promise((resolve, reject) => {
+    if (!APPS_SCRIPT_URL) {
+      resolve();
+      return;
     }
 
-    document.getElementById("submitBtn").addEventListener("click", async () => {
-      const payload = {
-        pid: "P001",
-        condition: "explicit_switch",
-        demographics: {
-          age: "29",
-          education: "Master",
-          native_english: "no",
-          background: "data science",
-        },
-        metrics: {
-          persev: 3,
-          recoveryTrial: 14,
-          postAcc: 0.8,
-          novelAcc: 0.9,
-          seq: "AAAAOO",
-          novelSeq: "AOAO",
-          oscil: 2,
-        },
-        metacog: "I noticed the rule changed after the feedback.",
-        responses: [
-          { trial: 1, stimulus: "dog", answer: "ALIVE", correct: true },
-          { trial: 2, stimulus: "chair", answer: "OBJECT", correct: true },
-        ],
-      };
+    try {
+      const { form, input } = ensureHiddenTransport();
+      input.value = JSON.stringify(payload);
+      form.submit();
+      resolve();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
 
-      await submitResults(payload);
-    });
-  </script>
+function downloadJSON(payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `efbench_${S.pid}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  EVENT HANDLERS
+// ════════════════════════════════════════════════════════════════════════════
+function handleDemographicsSubmit(e) {
+  e.preventDefault();
+  const f = e.target;
+  S.demographics = {
+    age: f.age.value,
+    education: f.education.value,
+    native_english: f.native_english.value,
+    background: f.background.value,
+  };
+  S.view = 'instruction';
+  render();
+}
+
+function handleResponse(response) {
+  const trial = ALL_TRIALS[S.trialIdx];
+  const correct = getCorrect(trial, S.trialIdx);
+  const isCorrect = response === correct;
+  const isPost = S.trialIdx >= 10;
+
+  if (isPost) S.consec = isCorrect ? 0 : S.consec + 1;
+
+  S.responses.push({
+    trialIdx: S.trialIdx,
+    sentence: trial.s,
+    living: trial.living,
+    response,
+    correct,
+    isCorrect,
+    phase: S.trialIdx < 10 ? 'establishment' : S.trialIdx < 20 ? 'post_switch' : 'novel',
+    rt_ms: Date.now() - S._trialStart,
+  });
+
+  const showHint =
+    isPost && !isCorrect &&
+    S.condition === 'partial_3' && S.consec >= 3;
+
+  S.feedback = { isCorrect, showHint };
+  S.view = 'feedback';
+  render();
+}
+
+function handleNext() {
+  const next = S.trialIdx + 1;
+  if (next === 10 && S.condition === 'explicit') {
+    S.trialIdx = next;
+    S.view = 'announce';
+    S.feedback = null;
+  } else if (next >= 25) {
+    S.trialIdx = next;
+    S.view = 'metacog';
+    S.feedback = null;
+  } else {
+    S.trialIdx = next;
+    S.view = 'trial';
+    S.feedback = null;
+  }
+  render();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  STYLES
+// ════════════════════════════════════════════════════════════════════════════
+const CSS = `
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    background: #fafaf8;
+    color: #1a1a1a;
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 40px 20px 80px;
+  }
+
+  .shell {
+    width: 100%;
+    max-width: 580px;
+  }
+
+  .eyebrow {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 28px;
+  }
+
+  h1 {
+    font-size: 26px;
+    font-weight: normal;
+    line-height: 1.3;
+    margin-bottom: 20px;
+    color: #111;
+  }
+
+  h2 {
+    font-size: 18px;
+    font-weight: normal;
+    margin-bottom: 16px;
+    color: #222;
+  }
+
+  p, li {
+    font-size: 15px;
+    line-height: 1.75;
+    color: #444;
+    margin-bottom: 12px;
+  }
+
+  ul { padding-left: 20px; margin-bottom: 16px; }
+
+  .rule-box {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-left: 4px solid #2d6b47;
+    padding: 18px 22px;
+    margin: 24px 0;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #1a1a1a;
+  }
+
+  .rule-box.new-rule {
+    border-left-color: #1a3d8f;
+    background: #f0f4ff;
+    animation: fadeIn 0.35s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 13px 28px;
+    background: #1a1a1a;
+    color: #fff;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s;
+    text-decoration: none;
+    margin-right: 10px;
+    margin-top: 8px;
+  }
+
+  .btn:hover { background: #333; }
+  .btn.secondary { background: transparent; color: #555; border: 1px solid #ccc; }
+  .btn.secondary:hover { background: #f0f0f0; }
+  .btn:disabled { background: #999; cursor: not-allowed; }
+
+  .sentence-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    padding: 30px 28px;
+    margin: 28px 0;
+    font-size: 17px;
+    line-height: 1.6;
+    color: #111;
+    min-height: 88px;
+    display: flex;
+    align-items: center;
+    animation: fadeIn 0.2s ease;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+
+  .response-btns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 8px;
+  }
+
+  .rbtn {
+    padding: 22px 16px;
+    border: 2px solid #ddd;
+    background: #fff;
+    font-family: 'Courier New', monospace;
+    font-size: 17px;
+    font-weight: bold;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+
+  .rbtn.alive  { color: #1a6b38; border-color: #a8d5b8; }
+  .rbtn.alive:hover  { background: #edf7f0; border-color: #2d8a4f; }
+  .rbtn.object { color: #1a3d8f; border-color: #a8bce0; }
+  .rbtn.object:hover { background: #edf0fb; border-color: #2d55b8; }
+  .rbtn:active { transform: scale(0.98); }
+
+  .progress-wrap { margin-bottom: 28px; }
+  .progress-meta {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: #999;
+    margin-bottom: 7px;
+  }
+  .progress-bar {
+    height: 3px;
+    background: #e8e8e8;
+    border-radius: 2px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: #888;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  .feedback-box {
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    border: 1px solid #ddd;
+    animation: fadeIn 0.2s ease;
+  }
+  .feedback-box.correct   { border-color: #2d8a4f; color: #1a6b38; background: #f0fbf4; }
+  .feedback-box.incorrect { border-color: #c0392b; color: #a93226; background: #fdf3f2; }
+  .feedback-box.hint      { border-color: #d4a017; color: #7d5a00; background: #fefae8; margin-top: 8px; }
+
+  .form-group { margin-bottom: 22px; }
+  .form-group label {
+    display: block;
+    font-size: 14px;
+    color: #333;
+    margin-bottom: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .form-group select, .form-group input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid #ccc;
+    background: #fff;
+    font-family: Georgia, serif;
+    font-size: 15px;
+    color: #1a1a1a;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 0l6 8 6-8z' fill='%23666'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+  }
+  .form-group select:focus { outline: none; border-color: #888; }
+  .form-divider { border: none; border-top: 1px solid #e8e8e8; margin: 32px 0; }
+
+  .completion-box {
+    background: #fff;
+    border: 1px solid #ddd;
+    padding: 24px 28px;
+    margin: 28px 0;
+  }
+  .completion-code {
+    font-family: 'Courier New', monospace;
+    font-size: 28px;
+    font-weight: bold;
+    color: #1a1a1a;
+    letter-spacing: 0.15em;
+    margin: 12px 0;
+  }
+  .seq-display {
+    font-family: 'Courier New', monospace;
+    font-size: 18px;
+    letter-spacing: 3px;
+    margin: 8px 0;
+  }
+  .ok  { color: #1a6b38; }
+  .err { color: #c0392b; }
+
+  .info-box {
+    background: #fff8e8;
+    border: 1px solid #e8d88a;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 13px;
+    color: #5a4500;
+    line-height: 1.6;
+  }
+
+  textarea {
+    width: 100%;
+    background: #fff;
+    border: 1px solid #ccc;
+    color: #1a1a1a;
+    font-family: Georgia, serif;
+    font-size: 15px;
+    padding: 14px 16px;
+    resize: vertical;
+    min-height: 110px;
+    margin: 16px 0;
+    line-height: 1.6;
+  }
+  textarea:focus { outline: none; border-color: #888; }
+
+  @media (max-width: 480px) {
+    body { padding: 24px 16px 60px; }
+    h1 { font-size: 22px; }
+    .sentence-card { font-size: 15px; padding: 22px 18px; }
+    .rbtn { font-size: 15px; padding: 18px 12px; }
+  }
+`;
+
+// ════════════════════════════════════════════════════════════════════════════
+//  RENDER
+// ════════════════════════════════════════════════════════════════════════════
+function render() {
+  const { view, trialIdx, feedback, metacog, saving, error } = S;
+
+  if (view === 'welcome') {
+    setHTML(`
+      <div class="eyebrow">EF-Bench · Human Baseline Study</div>
+      <h1>Sentence Labelling Task</h1>
+      <p>This is a short cognitive task that takes approximately <strong>8–10 minutes</strong> to complete.</p>
+      <p>You will see sentences one at a time and classify each one using a simple rule. After each response you will receive feedback — please read it carefully.</p>
+      <p>There are no trick questions. Just follow the instructions as best you can.</p>
+      <hr class="form-divider">
+      <p style="font-size:13px;color:#888">This task is part of an academic study on cognitive flexibility. Your responses are anonymous. No personal identifying information is collected.</p>
+      <div style="margin-top:32px">
+        <button class="btn" onclick="S.view='demographics';render()">Begin →</button>
+      </div>
+    `);
+    return;
+  }
+
+  if (view === 'demographics') {
+    setHTML(`
+      <div class="eyebrow">Background information</div>
+      <h1>A few quick questions</h1>
+      <p>Before we begin, please answer these brief questions. All responses are anonymous.</p>
+      <hr class="form-divider">
+      <form onsubmit="handleDemographicsSubmit(event)">
+        <div class="form-group">
+          <label for="age">Age range</label>
+          <select name="age" id="age" required>
+            <option value="">Select…</option>
+            <option>18–25</option>
+            <option>26–35</option>
+            <option>36–45</option>
+            <option>46–55</option>
+            <option>56+</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="education">Highest level of education completed</label>
+          <select name="education" id="education" required>
+            <option value="">Select…</option>
+            <option>High school / secondary</option>
+            <option>Bachelor's degree</option>
+            <option>Master's degree</option>
+            <option>PhD / Doctorate</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="native_english">Is English your native language?</label>
+          <select name="native_english" id="native_english" required>
+            <option value="">Select…</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="background">Primary background</label>
+          <select name="background" id="background" required>
+            <option value="">Select…</option>
+            <option value="academia_science">Research / Academia (science, engineering, medicine)</option>
+            <option value="academia_humanities">Research / Academia (humanities, social sciences)</option>
+            <option value="industry_tech">Industry — technology</option>
+            <option value="industry_other">Industry — other</option>
+            <option value="student">Student</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <hr class="form-divider">
+        <button type="submit" class="btn">Continue →</button>
+      </form>
+    `);
+    return;
+  }
+
+  if (view === 'instruction') {
+    setHTML(`
+      <div class="eyebrow">Instructions</div>
+      <h1>Your task</h1>
+      <p>For each sentence, decide whether it contains a living thing. Use this rule:</p>
+      <div class="rule-box">
+        RULE: If the sentence contains a living thing<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;→ press <strong>ALIVE</strong><br><br>
+        RULE: If it does <em>not</em> contain a living thing<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;→ press <strong>OBJECT</strong>
+      </div>
+      <p>After each response, you will see feedback. <strong>Read the feedback carefully</strong> — it may contain important information.</p>
+      <p>Respond as quickly and accurately as you can. There are 25 sentences in total.</p>
+      <hr class="form-divider">
+      <button class="btn" onclick="S.view='trial';S._trialStart=Date.now();render()">Start →</button>
+    `);
+    return;
+  }
+
+  if (view === 'announce') {
+    setHTML(`
+      <div class="eyebrow">Important — rule change</div>
+      <h1>The rule has changed</h1>
+      <div class="rule-box new-rule">
+        NEW RULE: If the sentence contains a living thing<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;→ press <strong>OBJECT</strong><br><br>
+        NEW RULE: If it does <em>not</em> contain a living thing<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;→ press <strong>ALIVE</strong>
+      </div>
+      <p>The labels are now reversed. Follow this new rule for all remaining sentences.</p>
+      <div style="margin-top:28px">
+        <button class="btn" onclick="S.view='trial';S.feedback=null;S._trialStart=Date.now();render()">Continue →</button>
+      </div>
+    `);
+    return;
+  }
+
+  if (view === 'trial') {
+    if (!S._trialStart) S._trialStart = Date.now();
+    const trial = ALL_TRIALS[trialIdx];
+    const phase = trialIdx < 10 ? 'Part 1' : trialIdx < 20 ? 'Part 2' : 'Part 3';
+    const pct = (trialIdx / 25) * 100;
+    setHTML(`
+      <div class="progress-wrap">
+        <div class="progress-meta">
+          <span>Trial ${trialIdx + 1} of 25</span>
+          <span>${phase}</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:${pct}%"></div>
+        </div>
+      </div>
+      <div class="sentence-card">${trial.s}</div>
+      <div class="response-btns">
+        <button class="rbtn alive" onclick="handleResponse('ALIVE')">ALIVE</button>
+        <button class="rbtn object" onclick="handleResponse('OBJECT')">OBJECT</button>
+      </div>
+    `);
+    return;
+  }
+
+  if (view === 'feedback') {
+    const trial = ALL_TRIALS[trialIdx];
+    const phase = trialIdx < 10 ? 'Part 1' : trialIdx < 20 ? 'Part 2' : 'Part 3';
+    const pct = ((trialIdx + 1) / 25) * 100;
+    const fb = feedback || {};
+    setHTML(`
+      <div class="progress-wrap">
+        <div class="progress-meta">
+          <span>Trial ${trialIdx + 1} of 25</span>
+          <span>${phase}</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:${pct}%"></div>
+        </div>
+      </div>
+      <div class="sentence-card">${trial.s}</div>
+      <div class="feedback-box ${fb.isCorrect ? 'correct' : 'incorrect'}">
+        ${fb.isCorrect ? '[CORRECT]' : '[INCORRECT]'}
+      </div>
+      ${fb.showHint ? `<div class="feedback-box hint">${HINT}</div>` : ''}
+      <div style="margin-top:28px">
+        <button class="btn" onclick="S._trialStart=Date.now();handleNext()">Next →</button>
+      </div>
+    `);
+    return;
+  }
+
+  if (view === 'metacog') {
+    setHTML(`
+      <div class="eyebrow">Final question</div>
+      <h1>One last question</h1>
+      <p>During the last several sentences, you may have received INCORRECT responses.</p>
+      <p><strong>Did you notice anything unusual?</strong> If so, please describe in 2–3 sentences what you think happened.</p>
+      <textarea
+        placeholder="Your answer here…"
+        oninput="S.metacog=this.value"
+      >${metacog}</textarea>
+      <p style="font-size:13px;color:#888">You can leave this blank if you have nothing to add.</p>
+      <div style="margin-top:24px">
+        <button class="btn" onclick="submitResults()" ${saving ? 'disabled' : ''}>
+          ${saving ? 'Submitting…' : 'Submit →'}
+        </button>
+      </div>
+    `);
+    return;
+  }
+
+  if (view === 'done') {
+    const metrics = computeMetrics();
+    const seqHtml = metrics.seq.split('').map(c =>
+      `<span class="${c === '✓' ? 'ok' : 'err'}">${c}</span>`).join('');
+    setHTML(`
+      <div class="eyebrow">Complete</div>
+      <h1>Thank you!</h1>
+      <p>Your participation is greatly appreciated.</p>
+      ${error ? `<div class="info-box">${error}</div>` : ''}
+      <div class="completion-box">
+        <div style="font-family:'Courier New',monospace;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.1em">Completion code</div>
+        <div class="completion-code">${STUDY_CODE}</div>
+        <div style="font-size:13px;color:#888;margin-top:4px">Please note this code if required by the researcher.</div>
+      </div>
+      <div class="completion-box">
+        <div style="font-family:'Courier New',monospace;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px">Your post-switch sequence</div>
+        <div class="seq-display">${seqHtml || '—'}</div>
+        <div style="font-size:12px;color:#999;margin-top:8px;font-family:'Courier New',monospace">
+          perseveration: ${metrics.persev} trial${metrics.persev !== 1 ? 's' : ''} &nbsp;|&nbsp;
+          accuracy: ${(metrics.postAcc * 100).toFixed(0)}%
+        </div>
+      </div>
+      <p style="font-size:13px;color:#888">Your results have been downloaded to your device as a JSON file. If asked by the researcher, please send them this file.</p>
+    `);
+    return;
+  }
+}
+
+function setHTML(html) {
+  const app = document.getElementById('app');
+  if (app) app.innerHTML = html;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  BOOT
+// ════════════════════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  const style = document.createElement('style');
+  style.textContent = CSS;
+  document.head.appendChild(style);
+
+  const app = document.createElement('div');
+  app.id = 'app';
+  app.className = 'shell';
+  document.body.appendChild(app);
+
+  render();
+});
+</script>
 </body>
 </html>
