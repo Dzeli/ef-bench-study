@@ -4,59 +4,220 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>EF-Bench · Sentence Labelling Task</title>
-<style>
-/* ─── CONFIG: paste your Google Apps Script URL below ─────────────────────
-   Leave as empty string "" to use download-only mode (results saved locally)
-   ─────────────────────────────────────────────────────────────────────── */
-</style>
 </head>
 <body>
-
 <script>
 // ════════════════════════════════════════════════════════════════════════════
 //  CONFIGURATION
 // ════════════════════════════════════════════════════════════════════════════
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxqgHAN5D5ee3rsKoI5Js1M-eWqjnLmhgqWIfdDtNB-60zT_xM0qo5m_nwp94y2g_8BSg/exec";
 
+// ── Language detection ────────────────────────────────────────────────────
+// English: dzeli.github.io/ef-bench-study/
+// Serbian: dzeli.github.io/ef-bench-study/?lang=sr
+const LANG_CODE = new URLSearchParams(window.location.search).get('lang') === 'sr' ? 'sr' : 'en';
+
+// ── UI strings ────────────────────────────────────────────────────────────
+const UI = {
+  en: {
+    eyebrow_study:    "EF-Bench · Human Baseline Study",
+    title_welcome:    "Sentence Labelling Task",
+    p_welcome_1:      "This is a short cognitive task that takes approximately <strong>8–10 minutes</strong> to complete.",
+    p_welcome_2:      "You will see sentences one at a time and classify each one using a simple rule. After each response you will receive feedback — please read it carefully.",
+    p_welcome_3:      "There are no trick questions. Just follow the instructions as best you can.",
+    p_welcome_anon:   "This task is part of an academic study on cognitive flexibility. Your responses are anonymous. No personal identifying information is collected.",
+    btn_begin:        "Begin →",
+
+    already_title:    "Already completed",
+    already_body:     "It looks like you have already completed this study from this device. Each person should complete the task only once — thank you for your participation!",
+    already_contact:  "If you believe this is an error (e.g. different person on same device), please contact the researcher.",
+
+    eyebrow_demo:     "Background information",
+    title_demo:       "A few quick questions",
+    p_demo:           "Before we begin, please answer these brief questions. All responses are anonymous.",
+    lbl_age:          "Age range",
+    lbl_edu:          "Highest level of education completed",
+    lbl_english:      "Is English your native language?",
+    lbl_bg:           "Primary background",
+    opt_select:       "Select…",
+    opt_age:          ["18–25","26–35","36–45","46–55","56+"],
+    opt_edu:          ["High school / secondary","Bachelor's degree","Master's degree","PhD / Doctorate","Other"],
+    opt_eng:          [["yes","Yes"],["no","No"]],
+    opt_bg:           [
+      ["academia_science",    "Research / Academia (science, engineering, medicine)"],
+      ["academia_humanities", "Research / Academia (humanities, social sciences)"],
+      ["industry_tech",       "Industry — technology"],
+      ["industry_other",      "Industry — other"],
+      ["student",             "Student"],
+      ["other",               "Other"],
+    ],
+    btn_continue:     "Continue →",
+
+    eyebrow_inst:     "Instructions",
+    title_inst:       "Your task",
+    p_inst_1:         "For each sentence, decide whether it contains a living thing. Use this rule:",
+    rule_alive:       "RULE: If the sentence contains a living thing",
+    rule_alive_2:     "→ press <strong>ALIVE</strong>",
+    rule_obj:         "RULE: If it does <em>not</em> contain a living thing",
+    rule_obj_2:       "→ press <strong>OBJECT</strong>",
+    note_labels:      "",
+    p_inst_2:         "After each response, you will see feedback. <strong>Read the feedback carefully</strong> — it may contain important information.",
+    p_inst_3:         "Respond as quickly and accurately as you can. There are 25 sentences in total.",
+    btn_start:        "Start →",
+
+    eyebrow_announce: "Important — rule change",
+    title_announce:   "The rule has changed",
+    new_rule_alive:   "NEW RULE: If the sentence contains a living thing",
+    new_rule_alive_2: "→ press <strong>OBJECT</strong>",
+    new_rule_obj:     "NEW RULE: If it does <em>not</em> contain a living thing",
+    new_rule_obj_2:   "→ press <strong>ALIVE</strong>",
+    p_announce:       "The labels are now reversed. Follow this new rule for all remaining sentences.",
+    btn_cont2:        "Continue →",
+
+    trial_of:         (i, n) => `Trial ${i} of ${n}`,
+    part:             (i) => i < 10 ? 'Part 1' : i < 20 ? 'Part 2' : 'Part 3',
+    btn_next:         "Next →",
+    hint:             "Note: the rule governing correct responses may have changed.",
+
+    eyebrow_metacog:  "Final question",
+    title_metacog:    "One last question",
+    p_metacog_1:      "During the last several sentences, you may have received INCORRECT responses.",
+    p_metacog_2:      "<strong>Did you notice anything unusual?</strong> If so, please describe in 2–3 sentences what you think happened.",
+    placeholder_meta: "Your answer here…",
+    p_metacog_3:      "You can leave this blank if you have nothing to add.",
+    btn_submit:       "Submit →",
+    btn_submitting:   "Submitting…",
+
+    eyebrow_done:     "Complete",
+    title_done:       "Thank you!",
+    p_done:           "Your participation is greatly appreciated.",
+    label_seq:        "Your post-switch sequence",
+    persev_label:     (n) => `perseveration: ${n} trial${n!==1?'s':''}`,
+    acc_label:        (p) => `accuracy: ${p}%`,
+  },
+  sr: {
+    eyebrow_study:    "EF-Bench · Studija kognitivne fleksibilnosti",
+    title_welcome:    "Zadatak označavanja rečenica",
+    p_welcome_1:      "Ovo je kratki kognitivni zadatak koji traje oko <strong>8–10 minuta</strong>.",
+    p_welcome_2:      "Videćete rečenice jednu po jednu i klasifikovati svaku koristeći jednostavno pravilo. Nakon svakog odgovora dobićete povratnu informaciju — molimo vas da je pažljivo pročitate.",
+    p_welcome_3:      "Nema zamki. Samo sledite uputstva što bolje možete.",
+    p_welcome_anon:   "Ovaj zadatak je deo akademske studije o kognitivnoj fleksibilnosti. Vaši odgovori su anonimni. Ne prikupljaju se lični podaci.",
+    btn_begin:        "Počni →",
+
+    already_title:    "Već završeno",
+    already_body:     "Izgleda da ste već završili ovu studiju sa ovog uređaja. Svaka osoba treba da završi zadatak samo jednom — hvala na učešću!",
+    already_contact:  "Ako smatrate da je ovo greška (npr. druga osoba na istom uređaju), molimo kontaktirajte istraživača.",
+
+    eyebrow_demo:     "Demografski podaci",
+    title_demo:       "Nekoliko kratkih pitanja",
+    p_demo:           "Pre nego što počnemo, molimo odgovorite na ova kratka pitanja. Svi odgovori su anonimni.",
+    lbl_age:          "Starosna grupa",
+    lbl_edu:          "Najviši nivo završenog obrazovanja",
+    lbl_english:      "Da li vam je engleski maternji jezik?",
+    lbl_bg:           "Osnovna oblast",
+    opt_select:       "Izaberite…",
+    opt_age:          ["18–25","26–35","36–45","46–55","56+"],
+    opt_edu:          ["Srednja škola","Bachelor / Osnovne studije","Master studije","Doktorat","Drugo"],
+    opt_eng:          [["yes","Da"],["no","Ne"]],
+    opt_bg:           [
+      ["academia_science",    "Nauka / Akademija (prirodne nauke, inžinjerstvo, medicina)"],
+      ["academia_humanities", "Nauka / Akademija (humanistika, društvene nauke)"],
+      ["industry_tech",       "Industrija — tehnologija"],
+      ["industry_other",      "Industrija — ostalo"],
+      ["student",             "Student/kinja"],
+      ["other",               "Drugo"],
+    ],
+    btn_continue:     "Nastavi →",
+
+    eyebrow_inst:     "Uputstva",
+    title_inst:       "Vaš zadatak",
+    p_inst_1:         "Za svaku rečenicu, odlučite da li sadrži živo biće. Koristite ovo pravilo:",
+    rule_alive:       "PRAVILO: Ako rečenica sadrži živo biće",
+    rule_alive_2:     "→ pritisnite <strong>ALIVE</strong> (živo biće)",
+    rule_obj:         "PRAVILO: Ako rečenica <em>ne</em> sadrži živo biće",
+    rule_obj_2:       "→ pritisnite <strong>OBJECT</strong> (predmet)",
+    note_labels:      "<p style='font-size:13px;color:#888;margin-top:12px'>Dugmići koriste engleske oznake: <strong>ALIVE</strong> = živo biće &nbsp;·&nbsp; <strong>OBJECT</strong> = predmet</p>",
+    p_inst_2:         "Nakon svakog odgovora, videćete povratnu informaciju. <strong>Pažljivo pročitajte povratnu informaciju</strong> — može sadržati važne informacije.",
+    p_inst_3:         "Odgovarajte što brže i tačnije možete. Ukupno ima 25 rečenica.",
+    btn_start:        "Počni →",
+
+    eyebrow_announce: "Važno — promena pravila",
+    title_announce:   "Pravilo se promenilo",
+    new_rule_alive:   "NOVO PRAVILO: Ako rečenica sadrži živo biće",
+    new_rule_alive_2: "→ pritisnite <strong>OBJECT</strong>",
+    new_rule_obj:     "NOVO PRAVILO: Ako rečenica <em>ne</em> sadrži živo biće",
+    new_rule_obj_2:   "→ pritisnite <strong>ALIVE</strong>",
+    p_announce:       "Oznake su sada zamenjene. Sledite ovo novo pravilo za sve preostale rečenice.",
+    btn_cont2:        "Nastavi →",
+
+    trial_of:         (i, n) => `Pokušaj ${i} od ${n}`,
+    part:             (i) => i < 10 ? 'Deo 1' : i < 20 ? 'Deo 2' : 'Deo 3',
+    btn_next:         "Sledeće →",
+    hint:             "Napomena: pravilo za tačne odgovore se možda promenilo.",
+
+    eyebrow_metacog:  "Završno pitanje",
+    title_metacog:    "Još jedno pitanje",
+    p_metacog_1:      "Tokom poslednjih nekoliko rečenica, možda ste dobili INCORRECT odgovore.",
+    p_metacog_2:      "<strong>Da li ste primetili nešto neobično?</strong> Ako jeste, molimo opišite u 2–3 rečenice šta mislite da se dogodilo.",
+    placeholder_meta: "Vaš odgovor ovde…",
+    p_metacog_3:      "Možete ostaviti prazno ako nemate šta da dodate.",
+    btn_submit:       "Pošalji →",
+    btn_submitting:   "Slanje…",
+
+    eyebrow_done:     "Završeno",
+    title_done:       "Hvala!",
+    p_done:           "Vaše učešće je veoma cenjeno.",
+    label_seq:        "Vaša sekvenca nakon promene pravila",
+    persev_label:     (n) => `perseveracija: ${n} pokušaj${n===1?'':'a'}`,
+    acc_label:        (p) => `tačnost: ${p}%`,
+  },
+};
+
+// Shorthand: T('key') returns the right language string
+const T = key => UI[LANG_CODE][key];
+
 // ════════════════════════════════════════════════════════════════════════════
-//  TASK DATA
+//  TASK DATA — each trial has English (s) and Serbian (sr) sentence
 // ════════════════════════════════════════════════════════════════════════════
+// Pattern: T F T F T T F F T F  (5 living, 5 non-living)
 const ESTABLISHMENT = [
-  { s: "The cat slept on the warm radiator.",         living: true  },
-  { s: "A candle flickered on the kitchen table.",    living: false },
-  { s: "The children ran through the autumn leaves.", living: true  },
-  { s: "The old bicycle leaned against the wall.",    living: false },
-  { s: "A robin perched on the garden fence.",        living: true  },
-  { s: "The kettle whistled on the stove.",           living: false },
-  { s: "The farmer's dog barked at the gate.",        living: true  },
-  { s: "An empty bottle rolled across the floor.",    living: false },
-  { s: "Wildflowers grew along the riverbank.",       living: true  },
-  { s: "The clock on the wall stopped ticking.",      living: false },
+  { s: "The cat slept on the warm radiator.",         sr: "Mačka je spavala na toplom radijatoru.",          living: true  },
+  { s: "A candle flickered on the kitchen table.",    sr: "Sveća je treperila na kuhinjskom stolu.",          living: false },
+  { s: "The children ran through the autumn leaves.", sr: "Deca su trčala kroz jesenje lišće.",               living: true  },
+  { s: "The old bicycle leaned against the wall.",    sr: "Stari bicikl je bio naslonjen na zid.",            living: false },
+  { s: "A robin perched on the garden fence.",        sr: "Crvendać je seo na ogradu bašte.",                 living: true  },
+  { s: "The farmer's dog barked at the gate.",        sr: "Farmerov pas je lajao na kapiji.",                 living: true  },
+  { s: "The kettle whistled on the stove.",           sr: "Ketl je zviždao na šporetu.",                      living: false },
+  { s: "An empty bottle rolled across the floor.",    sr: "Prazna flaša se kotrljala po podu.",               living: false },
+  { s: "Wildflowers grew along the riverbank.",       sr: "Divlje cveće je raslo duž obale reke.",            living: true  },
+  { s: "The clock on the wall stopped ticking.",      sr: "Sat na zidu je prestao da otkucava.",              living: false },
 ];
 
 const POST_SWITCH_BASE = [
-  { s: "A squirrel buried nuts under the oak tree.", living: true  },
-  { s: "The hammer lay on the workbench.",           living: false },
-  { s: "Three crows circled above the field.",       living: true  },
-  { s: "The broken window let in the cold air.",     living: false },
-  { s: "The old mare grazed in the meadow.",         living: true  },
-  { s: "Dust settled on the empty shelf.",           living: false },
-  { s: "A moth flew toward the porch light.",        living: true  },
-  { s: "The iron gate creaked in the wind.",         living: false },
-  { s: "The shepherd guided his flock downhill.",    living: true  },
-  { s: "Snow covered the abandoned car.",            living: false },
+  { s: "A squirrel buried nuts under the oak tree.", sr: "Veverica je zakopala orahe ispod hrasta.",          living: true  },
+  { s: "The hammer lay on the workbench.",           sr: "Čekić je ležao na radnoj klupi.",                   living: false },
+  { s: "Three crows circled above the field.",       sr: "Tri vrane su kružile iznad polja.",                 living: true  },
+  { s: "The broken window let in the cold air.",     sr: "Razbijen prozor je puštao hladni vazduh.",          living: false },
+  { s: "The old mare grazed in the meadow.",         sr: "Stara kobila je pasla na livadi.",                  living: true  },
+  { s: "Dust settled on the empty shelf.",           sr: "Prašina se nataložila na praznoj polici.",          living: false },
+  { s: "A moth flew toward the porch light.",        sr: "Noćni leptir je leteo prema svetlu na trijemu.",   living: true  },
+  { s: "The iron gate creaked in the wind.",         sr: "Gvozdena kapija je škripala na vetru.",             living: false },
+  { s: "The shepherd guided his flock downhill.",    sr: "Pastir je vodio stado niz brdo.",                   living: true  },
+  { s: "Snow covered the abandoned car.",            sr: "Sneg je prekrio napušteni automobil.",              living: false },
 ];
 
-// Novel probe items — kept in fixed order (not alternating, no need to shuffle)
 const NOVEL = [
-  { s: "Bacteria spread across the petri dish.",       living: true  },
-  { s: "A cactus stood in the corner of the room.",    living: true  },
-  { s: "The robot moved along the warehouse floor.",   living: false },
-  { s: "A flame flickered at the tip of the candle.",  living: false },
-  { s: "A crystal grew slowly inside the sealed jar.", living: false },
+  { s: "Bacteria spread across the petri dish.",       sr: "Bakterije su se širile po Petrijevoj posudi.",      living: true  },
+  { s: "A cactus stood in the corner of the room.",    sr: "Kaktus je stajao u uglu sobe.",                    living: true  },
+  { s: "The robot moved along the warehouse floor.",   sr: "Robot se kretao po podu skladišta.",               living: false },
+  { s: "A flame flickered at the tip of the candle.",  sr: "Plamen je treperio na vrhu sveće.",                living: false },
+  { s: "A crystal grew slowly inside the sealed jar.", sr: "Kristal je polako rastao unutar zatvorene tegle.", living: false },
 ];
 
-// ── Fisher-Yates shuffle ──────────────────────────────────────────────────
+function sentence(trial) {
+  return LANG_CODE === 'sr' ? trial.sr : trial.s;
+}
+
 function shuffle(arr) {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
@@ -66,12 +227,9 @@ function shuffle(arr) {
   return a;
 }
 
-// Shuffle post-switch trials once on page load — breaks alternating pattern
 const POST_SWITCH = shuffle(POST_SWITCH_BASE);
-const ALL_TRIALS = [...ESTABLISHMENT, ...POST_SWITCH, ...NOVEL];
-
-const CONDITIONS = ["explicit", "partial_3", "implicit"];
-const HINT = "Note: the rule governing correct responses may have changed.";
+const ALL_TRIALS  = [...ESTABLISHMENT, ...POST_SWITCH, ...NOVEL];
+const CONDITIONS  = ["explicit", "partial_3", "implicit"];
 
 // ════════════════════════════════════════════════════════════════════════════
 //  HELPERS
@@ -81,28 +239,22 @@ function getCorrect(trial, idx) {
   return trial.living ? "OBJECT" : "ALIVE";
 }
 
-function genId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-}
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
 function pickCondition() {
   try {
     const n = parseInt(localStorage.getItem('efb_count') || '0');
     localStorage.setItem('efb_count', String(n + 1));
     return CONDITIONS[n % 3];
-  } catch(e) {
-    return CONDITIONS[Math.floor(Math.random() * 3)];
-  }
+  } catch(e) { return CONDITIONS[Math.floor(Math.random() * 3)]; }
 }
 
 function alreadyDone() {
-  try { return !!localStorage.getItem('efb_done'); }
-  catch(e) { return false; }
+  try { return !!localStorage.getItem('efb_done'); } catch(e) { return false; }
 }
 
 function markDone() {
-  try { localStorage.setItem('efb_done', '1'); }
-  catch(e) {}
+  try { localStorage.setItem('efb_done', '1'); } catch(e) {}
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -112,6 +264,7 @@ const S = {
   view:         alreadyDone() ? 'already_done' : 'welcome',
   pid:          genId(),
   condition:    pickCondition(),
+  lang:         LANG_CODE,
   trialIdx:     0,
   responses:    [],
   feedback:     null,
@@ -124,27 +277,20 @@ const S = {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
-//  COMPUTED METRICS
+//  METRICS
 // ════════════════════════════════════════════════════════════════════════════
 function computeMetrics() {
   const post  = S.responses.filter(r => r.phase === 'post_switch');
   const novel = S.responses.filter(r => r.phase === 'novel');
-
-  let persev = 0;
+  let persev  = 0;
   for (const r of post) { if (!r.isCorrect) persev++; else break; }
-
   const recoveryIdx   = post.findIndex(r => r.isCorrect);
   const recoveryTrial = recoveryIdx === -1 ? null : recoveryIdx + 1;
-
-  const postAcc  = post.length  ? post.filter(r => r.isCorrect).length  / post.length  : 0;
-  const novelAcc = novel.length ? novel.filter(r => r.isCorrect).length / novel.length : 0;
-
-  const seq      = post.map(r  => r.isCorrect ? '✓' : '✗').join('');
-  const novelSeq = novel.map(r => r.isCorrect ? '✓' : '✗').join('');
-
-  const oscil = post.reduce((c, r, i) =>
-    i > 0 && r.isCorrect !== post[i-1].isCorrect ? c + 1 : c, 0);
-
+  const postAcc  = post.length  ? post.filter(r=>r.isCorrect).length/post.length  : 0;
+  const novelAcc = novel.length ? novel.filter(r=>r.isCorrect).length/novel.length : 0;
+  const seq      = post.map(r=>r.isCorrect?'✓':'✗').join('');
+  const novelSeq = novel.map(r=>r.isCorrect?'✓':'✗').join('');
+  const oscil    = post.reduce((c,r,i)=>i>0&&r.isCorrect!==post[i-1].isCorrect?c+1:c,0);
   return { persev, recoveryTrial, postAcc, novelAcc, seq, novelSeq, oscil };
 }
 
@@ -154,27 +300,21 @@ function computeMetrics() {
 async function submitResults() {
   S.saving = true;
   render();
-
   const metrics = computeMetrics();
   const payload = {
-    pid:          S.pid,
-    condition:    S.condition,
-    timestamp:    new Date().toISOString(),
-    demographics: S.demographics,
-    metrics,
-    responses:    S.responses,
-    metacog:      S.metacog,
-    // Record shuffled trial order for reproducibility
+    pid: S.pid, condition: S.condition, lang: S.lang,
+    timestamp: new Date().toISOString(),
+    demographics: S.demographics, metrics,
+    responses: S.responses, metacog: S.metacog,
     post_switch_order: POST_SWITCH.map(t => t.s),
   };
-
   if (APPS_SCRIPT_URL) {
     try { await submitViaHiddenForm(payload); }
-    catch(e) { S.error = 'Auto-submit failed — please screenshot the completion code.'; }
+    catch(e) { S.error = LANG_CODE === 'sr'
+      ? 'Automatsko slanje nije uspelo — snimite screenshot ekrana.'
+      : 'Auto-submit failed — please screenshot this screen.'; }
   }
-
-  markDone(); // prevent duplicate submissions from same device
-
+  markDone();
   S.saving = false;
   S.view   = 'done';
   render();
@@ -182,42 +322,19 @@ async function submitResults() {
 
 function ensureHiddenTransport() {
   let iframe = document.getElementById('hidden_iframe');
-  if (!iframe) {
-    iframe = document.createElement('iframe');
-    iframe.name = 'hidden_iframe';
-    iframe.id   = 'hidden_iframe';
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
-  }
+  if (!iframe) { iframe = document.createElement('iframe'); iframe.name='hidden_iframe'; iframe.id='hidden_iframe'; iframe.style.display='none'; document.body.appendChild(iframe); }
   let form = document.getElementById('gasForm');
-  if (!form) {
-    form = document.createElement('form');
-    form.id     = 'gasForm';
-    form.method = 'POST';
-    form.target = 'hidden_iframe';
-    form.style.display = 'none';
-    document.body.appendChild(form);
-  }
+  if (!form) { form = document.createElement('form'); form.id='gasForm'; form.method='POST'; form.target='hidden_iframe'; form.style.display='none'; document.body.appendChild(form); }
   let input = document.getElementById('payloadField');
-  if (!input) {
-    input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'payload';
-    input.id   = 'payloadField';
-    form.appendChild(input);
-  }
+  if (!input) { input = document.createElement('input'); input.type='hidden'; input.name='payload'; input.id='payloadField'; form.appendChild(input); }
   form.action = APPS_SCRIPT_URL;
   return { form, input };
 }
 
 function submitViaHiddenForm(payload) {
   return new Promise((resolve, reject) => {
-    try {
-      const { form, input } = ensureHiddenTransport();
-      input.value = JSON.stringify(payload);
-      form.submit();
-      resolve();
-    } catch(err) { reject(err); }
+    try { const { form, input } = ensureHiddenTransport(); input.value = JSON.stringify(payload); form.submit(); resolve(); }
+    catch(err) { reject(err); }
   });
 }
 
@@ -227,12 +344,7 @@ function submitViaHiddenForm(payload) {
 function handleDemographicsSubmit(e) {
   e.preventDefault();
   const f = e.target;
-  S.demographics = {
-    age:            f.age.value,
-    education:      f.education.value,
-    native_english: f.native_english.value,
-    background:     f.background.value,
-  };
+  S.demographics = { age: f.age.value, education: f.education.value, native_english: f.native_english.value, background: f.background.value };
   S.view = 'instruction';
   render();
 }
@@ -242,38 +354,23 @@ function handleResponse(response) {
   const correct   = getCorrect(trial, S.trialIdx);
   const isCorrect = response === correct;
   const isPost    = S.trialIdx >= 10;
-
   if (isPost) S.consec = isCorrect ? 0 : S.consec + 1;
-
   S.responses.push({
-    trialIdx:  S.trialIdx,
-    sentence:  trial.s,
-    living:    trial.living,
-    response,
-    correct,
-    isCorrect,
-    phase:  S.trialIdx < 10 ? 'establishment' : S.trialIdx < 20 ? 'post_switch' : 'novel',
-    rt_ms:  Date.now() - S._trialStart,
+    trialIdx: S.trialIdx, sentence: trial.s, sentence_sr: trial.sr,
+    living: trial.living, response, correct, isCorrect,
+    phase: S.trialIdx < 10 ? 'establishment' : S.trialIdx < 20 ? 'post_switch' : 'novel',
+    rt_ms: Date.now() - S._trialStart,
   });
-
-  const showHint =
-    isPost && !isCorrect &&
-    S.condition === 'partial_3' && S.consec >= 3;
-
-  S.feedback = { isCorrect, showHint };
-  S.view     = 'feedback';
+  S.feedback = { isCorrect, showHint: isPost && !isCorrect && S.condition === 'partial_3' && S.consec >= 3 };
+  S.view = 'feedback';
   render();
 }
 
 function handleNext() {
   const next = S.trialIdx + 1;
-  if (next === 10 && S.condition === 'explicit') {
-    S.trialIdx = next; S.view = 'announce'; S.feedback = null;
-  } else if (next >= 25) {
-    S.trialIdx = next; S.view = 'metacog';  S.feedback = null;
-  } else {
-    S.trialIdx = next; S.view = 'trial';    S.feedback = null;
-  }
+  if (next === 10 && S.condition === 'explicit') { S.trialIdx=next; S.view='announce'; S.feedback=null; }
+  else if (next >= 25) { S.trialIdx=next; S.view='metacog'; S.feedback=null; }
+  else { S.trialIdx=next; S.view='trial'; S.feedback=null; }
   render();
 }
 
@@ -282,119 +379,47 @@ function handleNext() {
 // ════════════════════════════════════════════════════════════════════════════
 const CSS = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: Georgia, 'Times New Roman', serif;
-    background: #fafaf8; color: #1a1a1a;
-    min-height: 100vh; display: flex; align-items: flex-start;
-    justify-content: center; padding: 40px 20px 80px;
-  }
-  .shell { width: 100%; max-width: 580px; }
-  .eyebrow {
-    font-family: 'Courier New', monospace; font-size: 11px;
-    letter-spacing: 0.15em; text-transform: uppercase; color: #888; margin-bottom: 28px;
-  }
-  h1 { font-size: 26px; font-weight: normal; line-height: 1.3; margin-bottom: 20px; color: #111; }
-  h2 { font-size: 18px; font-weight: normal; margin-bottom: 16px; color: #222; }
-  p, li { font-size: 15px; line-height: 1.75; color: #444; margin-bottom: 12px; }
-  ul { padding-left: 20px; margin-bottom: 16px; }
-
-  .rule-box {
-    background: #fff; border: 1px solid #ddd; border-left: 4px solid #2d6b47;
-    padding: 18px 22px; margin: 24px 0;
-    font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.7; color: #1a1a1a;
-  }
-  .rule-box.new-rule { border-left-color: #1a3d8f; background: #f0f4ff; animation: fadeIn 0.35s ease; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-
-  .btn {
-    display: inline-block; padding: 13px 28px; background: #1a1a1a; color: #fff;
-    font-family: 'Courier New', monospace; font-size: 13px; letter-spacing: 0.05em;
-    border: none; cursor: pointer; transition: background 0.15s;
-    text-decoration: none; margin-right: 10px; margin-top: 8px;
-  }
-  .btn:hover { background: #333; }
-  .btn.secondary { background: transparent; color: #555; border: 1px solid #ccc; }
-  .btn.secondary:hover { background: #f0f0f0; }
-  .btn:disabled { background: #999; cursor: not-allowed; }
-
-  .sentence-card {
-    background: #fff; border: 1px solid #ddd; padding: 30px 28px; margin: 28px 0;
-    font-size: 17px; line-height: 1.6; color: #111; min-height: 88px;
-    display: flex; align-items: center; animation: fadeIn 0.2s ease;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-  }
-  .response-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 8px; }
-  .rbtn {
-    padding: 22px 16px; border: 2px solid #ddd; background: #fff;
-    font-family: 'Courier New', monospace; font-size: 17px; font-weight: bold;
-    letter-spacing: 0.1em; cursor: pointer; transition: all 0.15s; text-align: center;
-  }
-  .rbtn.alive  { color: #1a6b38; border-color: #a8d5b8; }
-  .rbtn.alive:hover  { background: #edf7f0; border-color: #2d8a4f; }
-  .rbtn.object { color: #1a3d8f; border-color: #a8bce0; }
-  .rbtn.object:hover { background: #edf0fb; border-color: #2d55b8; }
-  .rbtn:active { transform: scale(0.98); }
-
-  .progress-wrap { margin-bottom: 28px; }
-  .progress-meta {
-    display: flex; justify-content: space-between;
-    font-family: 'Courier New', monospace; font-size: 11px; color: #999; margin-bottom: 7px;
-  }
-  .progress-bar { height: 3px; background: #e8e8e8; border-radius: 2px; }
-  .progress-fill { height: 100%; background: #888; border-radius: 2px; transition: width 0.3s ease; }
-
-  .feedback-box {
-    padding: 16px 20px; margin: 20px 0;
-    font-family: 'Courier New', monospace; font-size: 14px;
-    border: 1px solid #ddd; animation: fadeIn 0.2s ease;
-  }
-  .feedback-box.correct   { border-color: #2d8a4f; color: #1a6b38; background: #f0fbf4; }
-  .feedback-box.incorrect { border-color: #c0392b; color: #a93226; background: #fdf3f2; }
-  .feedback-box.hint      { border-color: #d4a017; color: #7d5a00; background: #fefae8; margin-top: 8px; }
-
-  .form-group { margin-bottom: 22px; }
-  .form-group label {
-    display: block; margin-bottom: 8px;
-    font-family: 'Courier New', monospace; font-size: 12px;
-    letter-spacing: 0.05em; text-transform: uppercase; color: #333;
-  }
-  .form-group select {
-    width: 100%; padding: 10px 14px; border: 1px solid #ccc; background: #fff;
-    font-family: Georgia, serif; font-size: 15px; color: #1a1a1a;
-    appearance: none; -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 0l6 8 6-8z' fill='%23666'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 14px center;
-  }
-  .form-group select:focus { outline: none; border-color: #888; }
-  .form-divider { border: none; border-top: 1px solid #e8e8e8; margin: 32px 0; }
-
-  .completion-box { background: #fff; border: 1px solid #ddd; padding: 24px 28px; margin: 28px 0; }
-  .seq-display { font-family: 'Courier New', monospace; font-size: 18px; letter-spacing: 3px; margin: 8px 0; }
-  .ok  { color: #1a6b38; }
-  .err { color: #c0392b; }
-
-  .info-box {
-    background: #fff8e8; border: 1px solid #e8d88a; padding: 14px 18px;
-    margin: 16px 0; font-size: 13px; color: #5a4500; line-height: 1.6;
-  }
-  .already-box {
-    background: #fdf3f2; border: 1px solid #e8b8b8; padding: 24px 28px;
-    margin: 28px 0; font-size: 15px; color: #7a2020; line-height: 1.7;
-  }
-
-  textarea {
-    width: 100%; background: #fff; border: 1px solid #ccc; color: #1a1a1a;
-    font-family: Georgia, serif; font-size: 15px; padding: 14px 16px;
-    resize: vertical; min-height: 110px; margin: 16px 0; line-height: 1.6;
-  }
-  textarea:focus { outline: none; border-color: #888; }
-
-  @media (max-width: 480px) {
-    body { padding: 24px 16px 60px; }
-    h1 { font-size: 22px; }
-    .sentence-card { font-size: 15px; padding: 22px 18px; }
-    .rbtn { font-size: 15px; padding: 18px 12px; }
-  }
+  body { font-family: Georgia,'Times New Roman',serif; background:#fafaf8; color:#1a1a1a; min-height:100vh; display:flex; align-items:flex-start; justify-content:center; padding:40px 20px 80px; }
+  .shell { width:100%; max-width:580px; }
+  .eyebrow { font-family:'Courier New',monospace; font-size:11px; letter-spacing:0.15em; text-transform:uppercase; color:#888; margin-bottom:28px; }
+  h1 { font-size:26px; font-weight:normal; line-height:1.3; margin-bottom:20px; color:#111; }
+  p, li { font-size:15px; line-height:1.75; color:#444; margin-bottom:12px; }
+  ul { padding-left:20px; margin-bottom:16px; }
+  .rule-box { background:#fff; border:1px solid #ddd; border-left:4px solid #2d6b47; padding:18px 22px; margin:24px 0; font-family:'Courier New',monospace; font-size:13px; line-height:1.7; color:#1a1a1a; }
+  .rule-box.new-rule { border-left-color:#1a3d8f; background:#f0f4ff; animation:fadeIn 0.35s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+  .btn { display:inline-block; padding:13px 28px; background:#1a1a1a; color:#fff; font-family:'Courier New',monospace; font-size:13px; letter-spacing:0.05em; border:none; cursor:pointer; transition:background 0.15s; margin-right:10px; margin-top:8px; }
+  .btn:hover { background:#333; }
+  .btn:disabled { background:#999; cursor:not-allowed; }
+  .sentence-card { background:#fff; border:1px solid #ddd; padding:30px 28px; margin:28px 0; font-size:17px; line-height:1.6; color:#111; min-height:88px; display:flex; align-items:center; animation:fadeIn 0.2s ease; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
+  .response-btns { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:8px; }
+  .rbtn { padding:22px 16px; border:2px solid #ddd; background:#fff; font-family:'Courier New',monospace; font-size:17px; font-weight:bold; letter-spacing:0.1em; cursor:pointer; transition:all 0.15s; text-align:center; }
+  .rbtn.alive  { color:#1a6b38; border-color:#a8d5b8; }
+  .rbtn.alive:hover  { background:#edf7f0; border-color:#2d8a4f; }
+  .rbtn.object { color:#1a3d8f; border-color:#a8bce0; }
+  .rbtn.object:hover { background:#edf0fb; border-color:#2d55b8; }
+  .rbtn:active { transform:scale(0.98); }
+  .progress-wrap { margin-bottom:28px; }
+  .progress-meta { display:flex; justify-content:space-between; font-family:'Courier New',monospace; font-size:11px; color:#999; margin-bottom:7px; }
+  .progress-bar  { height:3px; background:#e8e8e8; border-radius:2px; }
+  .progress-fill { height:100%; background:#888; border-radius:2px; transition:width 0.3s ease; }
+  .feedback-box  { padding:16px 20px; margin:20px 0; font-family:'Courier New',monospace; font-size:14px; border:1px solid #ddd; animation:fadeIn 0.2s ease; }
+  .feedback-box.correct   { border-color:#2d8a4f; color:#1a6b38; background:#f0fbf4; }
+  .feedback-box.incorrect { border-color:#c0392b; color:#a93226; background:#fdf3f2; }
+  .feedback-box.hint      { border-color:#d4a017; color:#7d5a00; background:#fefae8; margin-top:8px; }
+  .form-group { margin-bottom:22px; }
+  .form-group label { display:block; margin-bottom:8px; font-family:'Courier New',monospace; font-size:12px; letter-spacing:0.05em; text-transform:uppercase; color:#333; }
+  .form-group select { width:100%; padding:10px 14px; border:1px solid #ccc; background:#fff; font-family:Georgia,serif; font-size:15px; color:#1a1a1a; appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 0l6 8 6-8z' fill='%23666'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 14px center; }
+  .form-group select:focus { outline:none; border-color:#888; }
+  .form-divider { border:none; border-top:1px solid #e8e8e8; margin:32px 0; }
+  .completion-box { background:#fff; border:1px solid #ddd; padding:24px 28px; margin:28px 0; }
+  .seq-display { font-family:'Courier New',monospace; font-size:18px; letter-spacing:3px; margin:8px 0; }
+  .ok { color:#1a6b38; } .err { color:#c0392b; }
+  .info-box { background:#fff8e8; border:1px solid #e8d88a; padding:14px 18px; margin:16px 0; font-size:13px; color:#5a4500; line-height:1.6; }
+  .already-box { background:#fdf3f2; border:1px solid #e8b8b8; padding:24px 28px; margin:28px 0; font-size:15px; color:#7a2020; line-height:1.7; }
+  textarea { width:100%; background:#fff; border:1px solid #ccc; color:#1a1a1a; font-family:Georgia,serif; font-size:15px; padding:14px 16px; resize:vertical; min-height:110px; margin:16px 0; line-height:1.6; }
+  textarea:focus { outline:none; border-color:#888; }
+  @media (max-width:480px) { body{padding:24px 16px 60px} h1{font-size:22px} .sentence-card{font-size:15px;padding:22px 18px} .rbtn{font-size:15px;padding:18px 12px} }
 `;
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -403,217 +428,170 @@ const CSS = `
 function render() {
   const { view, trialIdx, feedback, metacog, saving, error } = S;
 
-  // ── Already done ──────────────────────────────────────────────────────────
   if (view === 'already_done') {
     setHTML(`
-      <div class="eyebrow">EF-Bench · Human Baseline Study</div>
-      <h1>Already completed</h1>
-      <div class="already-box">
-        It looks like you have already completed this study from this device.
-        Each person should complete the task only once — thank you for your participation!
-      </div>
-      <p style="font-size:13px;color:#888">If you believe this is an error (e.g. different person on same device), please contact the researcher.</p>
-    `);
-    return;
+      <div class="eyebrow">${T('eyebrow_study')}</div>
+      <h1>${T('already_title')}</h1>
+      <div class="already-box">${T('already_body')}</div>
+      <p style="font-size:13px;color:#888">${T('already_contact')}</p>
+    `); return;
   }
 
-  // ── Welcome ───────────────────────────────────────────────────────────────
   if (view === 'welcome') {
     setHTML(`
-      <div class="eyebrow">EF-Bench · Human Baseline Study</div>
-      <h1>Sentence Labelling Task</h1>
-      <p>This is a short cognitive task that takes approximately <strong>8–10 minutes</strong> to complete.</p>
-      <p>You will see sentences one at a time and classify each one using a simple rule. After each response you will receive feedback — please read it carefully.</p>
-      <p>There are no trick questions. Just follow the instructions as best you can.</p>
+      <div class="eyebrow">${T('eyebrow_study')}</div>
+      <h1>${T('title_welcome')}</h1>
+      <p>${T('p_welcome_1')}</p>
+      <p>${T('p_welcome_2')}</p>
+      <p>${T('p_welcome_3')}</p>
       <hr class="form-divider">
-      <p style="font-size:13px;color:#888">This task is part of an academic study on cognitive flexibility. Your responses are anonymous. No personal identifying information is collected.</p>
+      <p style="font-size:13px;color:#888">${T('p_welcome_anon')}</p>
       <div style="margin-top:32px">
-        <button class="btn" onclick="S.view='demographics';render()">Begin →</button>
+        <button class="btn" onclick="S.view='demographics';render()">${T('btn_begin')}</button>
       </div>
-    `);
-    return;
+    `); return;
   }
 
-  // ── Demographics ──────────────────────────────────────────────────────────
   if (view === 'demographics') {
+    const ageOpts  = T('opt_age').map(v=>`<option>${v}</option>`).join('');
+    const eduOpts  = T('opt_edu').map(v=>`<option>${v}</option>`).join('');
+    const engOpts  = T('opt_eng').map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+    const bgOpts   = T('opt_bg').map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
     setHTML(`
-      <div class="eyebrow">Background information</div>
-      <h1>A few quick questions</h1>
-      <p>Before we begin, please answer these brief questions. All responses are anonymous.</p>
+      <div class="eyebrow">${T('eyebrow_demo')}</div>
+      <h1>${T('title_demo')}</h1>
+      <p>${T('p_demo')}</p>
       <hr class="form-divider">
       <form onsubmit="handleDemographicsSubmit(event)">
         <div class="form-group">
-          <label for="age">Age range</label>
-          <select name="age" id="age" required>
-            <option value="">Select…</option>
-            <option>18–25</option><option>26–35</option>
-            <option>36–45</option><option>46–55</option><option>56+</option>
-          </select>
+          <label for="age">${T('lbl_age')}</label>
+          <select name="age" id="age" required><option value="">${T('opt_select')}</option>${ageOpts}</select>
         </div>
         <div class="form-group">
-          <label for="education">Highest level of education completed</label>
-          <select name="education" id="education" required>
-            <option value="">Select…</option>
-            <option>High school / secondary</option>
-            <option>Bachelor's degree</option>
-            <option>Master's degree</option>
-            <option>PhD / Doctorate</option>
-            <option>Other</option>
-          </select>
+          <label for="education">${T('lbl_edu')}</label>
+          <select name="education" id="education" required><option value="">${T('opt_select')}</option>${eduOpts}</select>
         </div>
         <div class="form-group">
-          <label for="native_english">Is English your native language?</label>
-          <select name="native_english" id="native_english" required>
-            <option value="">Select…</option>
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-          </select>
+          <label for="native_english">${T('lbl_english')}</label>
+          <select name="native_english" id="native_english" required><option value="">${T('opt_select')}</option>${engOpts}</select>
         </div>
         <div class="form-group">
-          <label for="background">Primary background</label>
-          <select name="background" id="background" required>
-            <option value="">Select…</option>
-            <option value="academia_science">Research / Academia (science, engineering, medicine)</option>
-            <option value="academia_humanities">Research / Academia (humanities, social sciences)</option>
-            <option value="industry_tech">Industry — technology</option>
-            <option value="industry_other">Industry — other</option>
-            <option value="student">Student</option>
-            <option value="other">Other</option>
-          </select>
+          <label for="background">${T('lbl_bg')}</label>
+          <select name="background" id="background" required><option value="">${T('opt_select')}</option>${bgOpts}</select>
         </div>
         <hr class="form-divider">
-        <button type="submit" class="btn">Continue →</button>
+        <button type="submit" class="btn">${T('btn_continue')}</button>
       </form>
-    `);
-    return;
+    `); return;
   }
 
-  // ── Instruction ───────────────────────────────────────────────────────────
   if (view === 'instruction') {
     setHTML(`
-      <div class="eyebrow">Instructions</div>
-      <h1>Your task</h1>
-      <p>For each sentence, decide whether it contains a living thing. Use this rule:</p>
+      <div class="eyebrow">${T('eyebrow_inst')}</div>
+      <h1>${T('title_inst')}</h1>
+      <p>${T('p_inst_1')}</p>
       <div class="rule-box">
-        RULE: If the sentence contains a living thing<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;→ press <strong>ALIVE</strong><br><br>
-        RULE: If it does <em>not</em> contain a living thing<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;→ press <strong>OBJECT</strong>
+        ${T('rule_alive')}<br>&nbsp;&nbsp;&nbsp;&nbsp;${T('rule_alive_2')}<br><br>
+        ${T('rule_obj')}<br>&nbsp;&nbsp;&nbsp;&nbsp;${T('rule_obj_2')}
       </div>
-      <p>After each response, you will see feedback. <strong>Read the feedback carefully</strong> — it may contain important information.</p>
-      <p>Respond as quickly and accurately as you can. There are 25 sentences in total.</p>
+      ${T('note_labels')}
+      <p>${T('p_inst_2')}</p>
+      <p>${T('p_inst_3')}</p>
       <hr class="form-divider">
-      <button class="btn" onclick="S.view='trial';S._trialStart=Date.now();render()">Start →</button>
-    `);
-    return;
+      <button class="btn" onclick="S.view='trial';S._trialStart=Date.now();render()">${T('btn_start')}</button>
+    `); return;
   }
 
-  // ── Announce (explicit condition only) ────────────────────────────────────
   if (view === 'announce') {
     setHTML(`
-      <div class="eyebrow">Important — rule change</div>
-      <h1>The rule has changed</h1>
+      <div class="eyebrow">${T('eyebrow_announce')}</div>
+      <h1>${T('title_announce')}</h1>
       <div class="rule-box new-rule">
-        NEW RULE: If the sentence contains a living thing<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;→ press <strong>OBJECT</strong><br><br>
-        NEW RULE: If it does <em>not</em> contain a living thing<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;→ press <strong>ALIVE</strong>
+        ${T('new_rule_alive')}<br>&nbsp;&nbsp;&nbsp;&nbsp;${T('new_rule_alive_2')}<br><br>
+        ${T('new_rule_obj')}<br>&nbsp;&nbsp;&nbsp;&nbsp;${T('new_rule_obj_2')}
       </div>
-      <p>The labels are now reversed. Follow this new rule for all remaining sentences.</p>
+      <p>${T('p_announce')}</p>
       <div style="margin-top:28px">
-        <button class="btn" onclick="S.view='trial';S.feedback=null;S._trialStart=Date.now();render()">Continue →</button>
+        <button class="btn" onclick="S.view='trial';S.feedback=null;S._trialStart=Date.now();render()">${T('btn_cont2')}</button>
       </div>
-    `);
-    return;
+    `); return;
   }
 
-  // ── Trial ─────────────────────────────────────────────────────────────────
   if (view === 'trial') {
     if (!S._trialStart) S._trialStart = Date.now();
     const trial = ALL_TRIALS[trialIdx];
-    const phase = trialIdx < 10 ? 'Part 1' : trialIdx < 20 ? 'Part 2' : 'Part 3';
     const pct   = (trialIdx / 25) * 100;
     setHTML(`
       <div class="progress-wrap">
         <div class="progress-meta">
-          <span>Trial ${trialIdx + 1} of 25</span>
-          <span>${phase}</span>
+          <span>${T('trial_of')(trialIdx+1, 25)}</span>
+          <span>${T('part')(trialIdx)}</span>
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
       </div>
-      <div class="sentence-card">${trial.s}</div>
+      <div class="sentence-card">${sentence(trial)}</div>
       <div class="response-btns">
         <button class="rbtn alive"  onclick="handleResponse('ALIVE')">ALIVE</button>
         <button class="rbtn object" onclick="handleResponse('OBJECT')">OBJECT</button>
       </div>
-    `);
-    return;
+    `); return;
   }
 
-  // ── Feedback ──────────────────────────────────────────────────────────────
   if (view === 'feedback') {
     const trial = ALL_TRIALS[trialIdx];
-    const phase = trialIdx < 10 ? 'Part 1' : trialIdx < 20 ? 'Part 2' : 'Part 3';
-    const pct   = ((trialIdx + 1) / 25) * 100;
+    const pct   = ((trialIdx+1)/25)*100;
     const fb    = feedback || {};
     setHTML(`
       <div class="progress-wrap">
         <div class="progress-meta">
-          <span>Trial ${trialIdx + 1} of 25</span>
-          <span>${phase}</span>
+          <span>${T('trial_of')(trialIdx+1, 25)}</span>
+          <span>${T('part')(trialIdx)}</span>
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
       </div>
-      <div class="sentence-card">${trial.s}</div>
-      <div class="feedback-box ${fb.isCorrect ? 'correct' : 'incorrect'}">
+      <div class="sentence-card">${sentence(trial)}</div>
+      <div class="feedback-box ${fb.isCorrect?'correct':'incorrect'}">
         ${fb.isCorrect ? '[CORRECT]' : '[INCORRECT]'}
       </div>
-      ${fb.showHint ? `<div class="feedback-box hint">${HINT}</div>` : ''}
+      ${fb.showHint ? `<div class="feedback-box hint">${T('hint')}</div>` : ''}
       <div style="margin-top:28px">
-        <button class="btn" onclick="S._trialStart=Date.now();handleNext()">Next →</button>
+        <button class="btn" onclick="S._trialStart=Date.now();handleNext()">${T('btn_next')}</button>
       </div>
-    `);
-    return;
+    `); return;
   }
 
-  // ── Metacognitive probe ───────────────────────────────────────────────────
   if (view === 'metacog') {
     setHTML(`
-      <div class="eyebrow">Final question</div>
-      <h1>One last question</h1>
-      <p>During the last several sentences, you may have received INCORRECT responses.</p>
-      <p><strong>Did you notice anything unusual?</strong> If so, please describe in 2–3 sentences what you think happened.</p>
-      <textarea placeholder="Your answer here…" oninput="S.metacog=this.value">${metacog}</textarea>
-      <p style="font-size:13px;color:#888">You can leave this blank if you have nothing to add.</p>
+      <div class="eyebrow">${T('eyebrow_metacog')}</div>
+      <h1>${T('title_metacog')}</h1>
+      <p>${T('p_metacog_1')}</p>
+      <p>${T('p_metacog_2')}</p>
+      <textarea placeholder="${T('placeholder_meta')}" oninput="S.metacog=this.value">${metacog}</textarea>
+      <p style="font-size:13px;color:#888">${T('p_metacog_3')}</p>
       <div style="margin-top:24px">
-        <button class="btn" onclick="submitResults()" ${saving ? 'disabled' : ''}>
-          ${saving ? 'Submitting…' : 'Submit →'}
+        <button class="btn" onclick="submitResults()" ${saving?'disabled':''}>
+          ${saving ? T('btn_submitting') : T('btn_submit')}
         </button>
       </div>
-    `);
-    return;
+    `); return;
   }
 
-  // ── Done ──────────────────────────────────────────────────────────────────
   if (view === 'done') {
     const metrics = computeMetrics();
-    const seqHtml = metrics.seq.split('').map(c =>
-      `<span class="${c==='✓'?'ok':'err'}">${c}</span>`).join('');
+    const seqHtml = metrics.seq.split('').map(c=>`<span class="${c==='✓'?'ok':'err'}">${c}</span>`).join('');
     setHTML(`
-      <div class="eyebrow">Complete</div>
-      <h1>Thank you!</h1>
-      <p>Your participation is greatly appreciated.</p>
+      <div class="eyebrow">${T('eyebrow_done')}</div>
+      <h1>${T('title_done')}</h1>
+      <p>${T('p_done')}</p>
       ${error ? `<div class="info-box">${error}</div>` : ''}
       <div class="completion-box">
-        <div style="font-family:'Courier New',monospace;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px">Your post-switch sequence</div>
-        <div class="seq-display">${seqHtml || '—'}</div>
+        <div style="font-family:'Courier New',monospace;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px">${T('label_seq')}</div>
+        <div class="seq-display">${seqHtml||'—'}</div>
         <div style="font-size:12px;color:#999;margin-top:8px;font-family:'Courier New',monospace">
-          perseveration: ${metrics.persev} trial${metrics.persev!==1?'s':''} &nbsp;|&nbsp;
-          accuracy: ${(metrics.postAcc*100).toFixed(0)}%
+          ${T('persev_label')(metrics.persev)} &nbsp;|&nbsp; ${T('acc_label')((metrics.postAcc*100).toFixed(0))}
         </div>
       </div>
-    `);
-    return;
+    `); return;
   }
 }
 
@@ -622,19 +600,13 @@ function setHTML(html) {
   if (app) app.innerHTML = html;
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-//  BOOT
-// ════════════════════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
   const style = document.createElement('style');
   style.textContent = CSS;
   document.head.appendChild(style);
-
   const app = document.createElement('div');
-  app.id        = 'app';
-  app.className = 'shell';
+  app.id = 'app'; app.className = 'shell';
   document.body.appendChild(app);
-
   render();
 });
 </script>
