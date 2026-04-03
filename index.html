@@ -113,7 +113,7 @@ const UI = {
     p_demo:           "Pre nego što počnemo, molimo odgovorite na ova kratka pitanja. Svi odgovori su anonimni.",
     lbl_age:          "Starosna grupa",
     lbl_edu:          "Najviši nivo završenog obrazovanja",
-    lbl_english:      "Da li vam je engleski maternji jezik?",
+    lbl_english:      "Da li vam je srpski maternji jezik?",
     lbl_bg:           "Osnovna oblast",
     opt_select:       "Izaberite…",
     opt_age:          ["18–25","26–35","36–45","46–55","56+"],
@@ -133,10 +133,10 @@ const UI = {
     title_inst:       "Vaš zadatak",
     p_inst_1:         "Za svaku rečenicu, odlučite da li sadrži živo biće. Koristite ovo pravilo:",
     rule_alive:       "PRAVILO: Ako rečenica sadrži živo biće",
-    rule_alive_2:     "→ pritisnite <strong>ALIVE</strong> (živo biće)",
+    rule_alive_2:     "→ pritisnite <strong>ŽIVO</strong>",
     rule_obj:         "PRAVILO: Ako rečenica <em>ne</em> sadrži živo biće",
-    rule_obj_2:       "→ pritisnite <strong>OBJECT</strong> (predmet)",
-    note_labels:      "<p style='font-size:13px;color:#888;margin-top:12px'>Dugmići koriste engleske oznake: <strong>ALIVE</strong> = živo biće &nbsp;·&nbsp; <strong>OBJECT</strong> = predmet</p>",
+    rule_obj_2:       "→ pritisnite <strong>OBJEKAT</strong>",
+    note_labels:      "",
     p_inst_2:         "Nakon svakog odgovora, videćete povratnu informaciju. <strong>Pažljivo pročitajte povratnu informaciju</strong> — može sadržati važne informacije.",
     p_inst_3:         "Odgovarajte što brže i tačnije možete. Ukupno ima 25 rečenica.",
     btn_start:        "Počni →",
@@ -144,9 +144,9 @@ const UI = {
     eyebrow_announce: "Važno — promena pravila",
     title_announce:   "Pravilo se promenilo",
     new_rule_alive:   "NOVO PRAVILO: Ako rečenica sadrži živo biće",
-    new_rule_alive_2: "→ pritisnite <strong>OBJECT</strong>",
+    new_rule_alive_2: "→ pritisnite <strong>OBJEKAT</strong>",
     new_rule_obj:     "NOVO PRAVILO: Ako rečenica <em>ne</em> sadrži živo biće",
-    new_rule_obj_2:   "→ pritisnite <strong>ALIVE</strong>",
+    new_rule_obj_2:   "→ pritisnite <strong>ŽIVO</strong>",
     p_announce:       "Oznake su sada zamenjene. Sledite ovo novo pravilo za sve preostale rečenice.",
     btn_cont2:        "Nastavi →",
 
@@ -157,7 +157,7 @@ const UI = {
 
     eyebrow_metacog:  "Završno pitanje",
     title_metacog:    "Još jedno pitanje",
-    p_metacog_1:      "Tokom poslednjih nekoliko rečenica, možda ste dobili INCORRECT odgovore.",
+    p_metacog_1:      "Tokom poslednjih nekoliko rečenica, možda ste dobili [INCORRECT] odgovore.",
     p_metacog_2:      "<strong>Da li ste primetili nešto neobično?</strong> Ako jeste, molimo opišite u 2–3 rečenice šta mislite da se dogodilo.",
     placeholder_meta: "Vaš odgovor ovde…",
     p_metacog_3:      "Možete ostaviti prazno ako nemate šta da dodate.",
@@ -531,8 +531,8 @@ function render() {
       </div>
       <div class="sentence-card">${sentence(trial)}</div>
       <div class="response-btns">
-        <button class="rbtn alive"  onclick="handleResponse('ALIVE')">ALIVE</button>
-        <button class="rbtn object" onclick="handleResponse('OBJECT')">OBJECT</button>
+        <button class="rbtn alive"  onclick="handleResponse('ALIVE')">${LANG_CODE === 'sr' ? 'ŽIVO' : 'ALIVE'}</button>
+        <button class="rbtn object" onclick="handleResponse('OBJECT')">${LANG_CODE === 'sr' ? 'OBJEKAT' : 'OBJECT'}</button>
       </div>
     `); return;
   }
