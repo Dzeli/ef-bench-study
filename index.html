@@ -94,6 +94,8 @@ const UI = {
     label_seq:        "Your post-switch sequence",
     persev_label:     (n) => `perseveration: ${n} trial${n!==1?'s':''}`,
     acc_label:        (p) => `accuracy: ${p}%`,
+    correct_label: "CORRECT",
+    incorrect_label: "INCORRECT",
   },
   sr: {
     eyebrow_study:    "EF-Bench · Studija kognitivne fleksibilnosti",
@@ -157,7 +159,7 @@ const UI = {
 
     eyebrow_metacog:  "Završno pitanje",
     title_metacog:    "Još jedno pitanje",
-    p_metacog_1:      "Tokom poslednjih nekoliko rečenica, možda ste dobili [INCORRECT] odgovore.",
+    p_metacog_1:      "Tokom poslednjih nekoliko rečenica, možda ste dobili [NETAČNO] odgovore.",
     p_metacog_2:      "<strong>Da li ste primetili nešto neobično?</strong> Ako jeste, molimo opišite u 2–3 rečenice šta mislite da se dogodilo.",
     placeholder_meta: "Vaš odgovor ovde…",
     p_metacog_3:      "Možete ostaviti prazno ako nemate šta da dodate.",
@@ -170,6 +172,8 @@ const UI = {
     label_seq:        "Vaša sekvenca nakon promene pravila",
     persev_label:     (n) => `perseveracija: ${n} pokušaj${n===1?'':'a'}`,
     acc_label:        (p) => `tačnost: ${p}%`,
+    correct_label: "TAČNO",
+    incorrect_label: "NETAČNO",
   },
 };
 
@@ -312,20 +316,15 @@ async function submitResults() {
     post_switch_order: POST_SWITCH.map(t => t.s),
   };
 
-  if (APPS_SCRIPT_URL) {
-    try {
-      await fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'payload=' + encodeURIComponent(JSON.stringify(payload)),
-      });
-    } catch(e) {
-      S.error = LANG_CODE === 'sr'
-        ? 'Automatsko slanje nije uspelo — zabeležite vaš ID: ' + S.pid
-        : 'Auto-submit failed — please note your ID: ' + S.pid;
-    }
+if (APPS_SCRIPT_URL) {
+  try {
+    await submitViaHiddenForm(payload);
+  } catch (e) {
+    S.error = LANG_CODE === 'sr'
+      ? 'Automatsko slanje nije uspelo — zabeležite vaš ID: ' + S.pid
+      : 'Auto-submit failed — please note your ID: ' + S.pid;
   }
+}
 
   markDone();
   S.saving = false;
@@ -336,6 +335,52 @@ async function submitResults() {
 // ════════════════════════════════════════════════════════════════════════════
 //  EVENT HANDLERS
 // ════════════════════════════════════════════════════════════════════════════
+  function ensureHiddenTransport() {
+  let iframe = document.getElementById('hidden_iframe');
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.name = 'hidden_iframe';
+    iframe.id = 'hidden_iframe';
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+  }
+
+  let form = document.getElementById('gasForm');
+  if (!form) {
+    form = document.createElement('form');
+    form.id = 'gasForm';
+    form.method = 'POST';
+    form.target = 'hidden_iframe';
+    form.style.display = 'none';
+    document.body.appendChild(form);
+  }
+
+  let input = document.getElementById('payloadField');
+  if (!input) {
+    input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payload';
+    input.id = 'payloadField';
+    form.appendChild(input);
+  }
+
+  form.action = APPS_SCRIPT_URL;
+  return { form, input };
+}
+
+function submitViaHiddenForm(payload) {
+  return new Promise((resolve, reject) => {
+    try {
+      const { form, input } = ensureHiddenTransport();
+      input.value = JSON.stringify(payload);
+      form.submit();
+      resolve();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+  
 function handleDemographicsSubmit(e) {
   e.preventDefault();
   const f = e.target;
@@ -546,7 +591,7 @@ function render() {
       </div>
       <div class="sentence-card">${sentence(trial)}</div>
       <div class="feedback-box ${fb.isCorrect?'correct':'incorrect'}">
-        ${fb.isCorrect ? '[CORRECT]' : '[INCORRECT]'}
+        ${fb.isCorrect ? `[${T('correct_label')}]` : `[${T('incorrect_label')}]`}
       </div>
       ${fb.showHint ? `<div class="feedback-box hint">${T('hint')}</div>` : ''}
       <div style="margin-top:28px">
