@@ -295,11 +295,14 @@ function computeMetrics() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  SUBMISSION — fetch with no-cors (works across all browsers)
+//  SUBMISSION — form-urlencoded fetch (most reliable cross-browser method)
+//  Works in Chrome, Firefox, Safari, Edge. No CORS preflight needed.
+//  Data arrives in e.parameter.payload in Apps Script.
 // ════════════════════════════════════════════════════════════════════════════
 async function submitResults() {
   S.saving = true;
   render();
+
   const metrics = computeMetrics();
   const payload = {
     pid: S.pid, condition: S.condition, lang: S.lang,
@@ -310,27 +313,17 @@ async function submitResults() {
   };
 
   if (APPS_SCRIPT_URL) {
-    // Try fetch first (works in all modern browsers including Firefox/Safari)
-    let submitted = false;
     try {
       await fetch(APPS_SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'payload=' + encodeURIComponent(JSON.stringify(payload)),
       });
-      submitted = true;
     } catch(e) {
-      // Fetch failed — try URL-encoded GET as final fallback
-      try {
-        const url = APPS_SCRIPT_URL + '?payload=' + encodeURIComponent(JSON.stringify(payload));
-        await fetch(url, { method: 'GET', mode: 'no-cors' });
-        submitted = true;
-      } catch(e2) {
-        S.error = LANG_CODE === 'sr'
-          ? 'Automatsko slanje nije uspelo — molimo kontaktirajte istraživača i pošaljite vaš ID: ' + S.pid
-          : 'Auto-submit failed — please contact the researcher with your ID: ' + S.pid;
-      }
+      S.error = LANG_CODE === 'sr'
+        ? 'Automatsko slanje nije uspelo — zabeležite vaš ID: ' + S.pid
+        : 'Auto-submit failed — please note your ID: ' + S.pid;
     }
   }
 
