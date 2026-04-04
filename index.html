@@ -263,11 +263,7 @@ function getCorrect(trial, idx) {
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
 function pickCondition() {
-  try {
-    const n = parseInt(localStorage.getItem('efb_count') || '0');
-    localStorage.setItem('efb_count', String(n + 1));
-    return CONDITIONS[n % 3];
-  } catch(e) { return CONDITIONS[Math.floor(Math.random() * 3)]; }
+  return CONDITIONS[Math.floor(Math.random() * CONDITIONS.length)];
 }
 
 function alreadyDone() {
