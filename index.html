@@ -6,6 +6,23 @@
 <title>EF-Bench · Sentence Labelling Task</title>
 </head>
 <body>
+<iframe
+  name="submit_iframe"
+  id="submit_iframe"
+  style="display:none;"
+  aria-hidden="true"
+></iframe>
+
+<form
+  id="submit_form"
+  method="POST"
+  target="submit_iframe"
+  enctype="application/x-www-form-urlencoded"
+  accept-charset="UTF-8"
+  style="display:none;"
+>
+  <input type="hidden" name="payload" id="payloadField">
+</form>
 <script>
 // ════════════════════════════════════════════════════════════════════════════
 //  CONFIGURATION
@@ -309,70 +326,49 @@ async function submitResults() {
 
   const metrics = computeMetrics();
   const payload = {
-    pid: S.pid, condition: S.condition, lang: S.lang,
+    pid: S.pid,
+    condition: S.condition,
+    lang: S.lang,
     timestamp: new Date().toISOString(),
-    demographics: S.demographics, metrics,
-    responses: S.responses, metacog: S.metacog,
+    demographics: S.demographics,
+    metrics,
+    responses: S.responses,
+    metacog: S.metacog,
     post_switch_order: POST_SWITCH.map(t => t.s),
   };
 
-if (APPS_SCRIPT_URL) {
-  try {
-    await submitViaHiddenForm(payload);
-  } catch (e) {
-    S.error = LANG_CODE === 'sr'
-      ? 'Automatsko slanje nije uspelo — zabeležite vaš ID: ' + S.pid
-      : 'Auto-submit failed — please note your ID: ' + S.pid;
+  if (APPS_SCRIPT_URL) {
+    try {
+      await submitViaHiddenForm(payload);
+    } catch (e) {
+      S.error = LANG_CODE === 'sr'
+        ? 'Automatsko slanje nije uspelo — zabeležite vaš ID: ' + S.pid
+        : 'Auto-submit failed — please note your ID: ' + S.pid;
+    }
   }
-}
 
   markDone();
   S.saving = false;
-  S.view   = 'done';
+  S.view = 'done';
   render();
 }
 
 // ════════════════════════════════════════════════════════════════════════════
 //  EVENT HANDLERS
 // ════════════════════════════════════════════════════════════════════════════
-  function ensureHiddenTransport() {
-  let iframe = document.getElementById('hidden_iframe');
-  if (!iframe) {
-    iframe = document.createElement('iframe');
-    iframe.name = 'hidden_iframe';
-    iframe.id = 'hidden_iframe';
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
-  }
-
-  let form = document.getElementById('gasForm');
-  if (!form) {
-    form = document.createElement('form');
-    form.id = 'gasForm';
-    form.method = 'POST';
-    form.target = 'hidden_iframe';
-    form.style.display = 'none';
-    document.body.appendChild(form);
-  }
-
-  let input = document.getElementById('payloadField');
-  if (!input) {
-    input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'payload';
-    input.id = 'payloadField';
-    form.appendChild(input);
-  }
-
-  form.action = APPS_SCRIPT_URL;
-  return { form, input };
-}
-
-function submitViaHiddenForm(payload) {
+ function submitViaHiddenForm(payload) {
   return new Promise((resolve, reject) => {
     try {
-      const { form, input } = ensureHiddenTransport();
+      const form = document.getElementById('submit_form');
+      const input = document.getElementById('payloadField');
+
+      if (!form || !input) {
+        throw new Error('Submit form not found');
+      }
+
+      form.action = APPS_SCRIPT_URL;
       input.value = JSON.stringify(payload);
+
       form.submit();
       resolve();
     } catch (err) {
